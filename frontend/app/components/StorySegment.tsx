@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, Image, TouchableOpacity, ScrollView } from 'react-native';
+import { StyleSheet, Text, View, Image, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { StorySegment as StorySegmentType } from '../types';
 import { MaterialIcons } from '@expo/vector-icons';
 import FullScreenImage from './FullScreenImage';
@@ -12,6 +12,7 @@ interface StorySegmentProps {
   choices?: string[];
   onToggleView: () => void;
   onChoiceSelect?: (choice: string) => void;
+  speakText?: (text: string) => void;
 }
 
 export default function StorySegmentComponent({
@@ -22,6 +23,7 @@ export default function StorySegmentComponent({
   choices,
   onToggleView,
   onChoiceSelect,
+  speakText,
 }: StorySegmentProps): JSX.Element {
   const [isImageFullScreen, setIsImageFullScreen] = useState(false);
 
@@ -144,10 +146,20 @@ export default function StorySegmentComponent({
           )}
           
           <View style={styles.textContainer}>
-            <View style={styles.textBubble}>
-              <ScrollView style={styles.scrollViewStyle}>
-                <Text style={styles.storyText}>{segment.text}</Text>
-              </ScrollView>
+            <View style={styles.textAndSpeakerContainer}>
+              <View style={styles.textBubble}>
+                <ScrollView style={styles.scrollViewStyle}>
+                  <Text style={styles.storyText}>{segment.text}</Text>
+                </ScrollView>
+              </View>
+              {Platform.OS === 'web' && speakText && segment.text && (
+                <TouchableOpacity 
+                  onPress={() => speakText(segment.text)} 
+                  style={styles.speakerButton}
+                >
+                  <MaterialIcons name="volume-up" size={24} color="#FFA726" />
+                </TouchableOpacity>
+              )}
             </View>
             
             <TouchableOpacity
@@ -199,29 +211,34 @@ const styles = StyleSheet.create({
   textContainer: {
     padding: 12,
     alignItems: 'center',
+    flex: 1,
   },
   questionContainer: {
     padding: 16,
     alignItems: 'center',
   },
+  textAndSpeakerContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    width: '100%',
+    marginBottom: 8,
+  },
   textBubble: {
     backgroundColor: '#FFF8E1',
     borderRadius: 20,
     padding: 12,
-    marginBottom: 8,
-    width: '100%',
+    width: 'auto',
+    flex: 1,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
     maxHeight: 250,
+    marginRight: 8,
   },
   scrollViewStyle: {
-    // flex: 1, // Might be useful if content isn't filling
+    // maxHeight: 230,
   },
   storyText: {
     fontSize: 18,
@@ -279,5 +296,10 @@ const styles = StyleSheet.create({
     color: 'red',
     textAlign: 'center',
     marginTop: 20,
+  },
+  speakerButton: {
+    padding: 5,
+    justifyContent: 'center',
+    alignSelf: 'center',
   },
 }); 

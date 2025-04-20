@@ -13,6 +13,7 @@ import {
   Alert,
   TextInput,
   Platform,
+  Pressable,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Stack, router } from 'expo-router';
@@ -468,6 +469,22 @@ export default function StoryBuilder(): JSX.Element {
     }
   };
 
+  // Function to handle speaking text using browser's TTS
+  const speakText = (text: string) => {
+    if (Platform.OS === 'web') {
+      if ('speechSynthesis' in window && text) {
+        window.speechSynthesis.cancel(); // Cancel previous speech
+        const utterance = new SpeechSynthesisUtterance(text);
+        window.speechSynthesis.speak(utterance);
+      } else {
+        if (!text) console.warn('Attempted to speak empty text.');
+        else console.warn('Browser Speech Synthesis not supported.');
+      }
+    } else {
+      console.log('Speech Synthesis is only implemented for web.');
+    }
+  };
+
   if (isLoading && currentStep === 'story') {
     return <LoadingSpinner message="Creating your story..." />;
   }
@@ -523,6 +540,7 @@ export default function StoryBuilder(): JSX.Element {
                 choices={currentChoices}
                 onToggleView={() => toggleSegmentView(story.segments.length - 1)}
                 onChoiceSelect={(choice: string) => handleChoice(choice)}
+                speakText={speakText}
               />
             ) : (
               <View style={styles.loadingContainer}>
