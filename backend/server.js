@@ -237,11 +237,17 @@ app.post('/start-story', async (req, res) => {
     console.log('Received start-story request:', req.body);
     const { style, character, setting, theme, visualStylePrompt } = req.body;
 
-    if (!style || !character || !setting || !visualStylePrompt) {
-        console.warn('Missing required fields for start-story:', { style, character, setting, visualStylePrompt });
-        return res.status(400).json({ success: false, error: 'Missing required fields: style, character, setting, visualStylePrompt' });
+    if (!style || !character || !setting || !theme || !visualStylePrompt) {
+        console.warn('Missing required fields for start-story:', { style, character, setting, theme, visualStylePrompt });
+        return res.status(400).json({ success: false, error: 'Missing required fields: style, character, setting, theme, visualStylePrompt' });
     }
     const effectiveTheme = theme || '';
+
+    // Ensure Redis is connected (Keep this check)
+    if (!global.redisClient || global.redisClient.status !== 'ready') {
+        console.error('Redis connection is not ready');
+        return res.status(500).json({ success: false, error: 'Redis connection is not ready' });
+    }
 
     // Use UUID for session ID generation (ensure uuid is installed: npm install uuid @types/uuid)
     // If you haven't installed uuid yet, run: npm install uuid @types/uuid
@@ -262,16 +268,9 @@ app.post('/start-story', async (req, res) => {
       // lastUpdated: new Date() // Less critical with TTL, Redis handles expiry
     };
 
-    // <<< Store session in Redis (or fallback Map) >>>
-    if (global.redisClient) {
-        // Use Redis SET with EX (expiry in seconds)
-        await global.redisClient.set(sessionId, JSON.stringify(sessionData), 'EX', SESSION_TTL_SECONDS);
-        console.log(`Session ${sessionId} stored in Redis with TTL ${SESSION_TTL_SECONDS}s.`);
-    } else {
-        // Fallback to Map (no TTL)
-        global.storySessions.set(sessionId, sessionData);
-        console.log(`Session ${sessionId} stored in fallback Map (no TTL).`);
-    }
+    // Use Redis directly (No if(useRedis) check needed)
+    await global.redisClient.set(sessionId, JSON.stringify(sessionData), 'EX', SESSION_TTL_SECONDS);
+    console.log(`Session ${sessionId} created and stored in Redis.`);
 
     console.log('Generating first story segment (Step 1) using Together AI...');
     const initialPrompt = `Start a children's story (around 50-70 words, simple language) with:\nStyle: ${style}\nCharacter: ${character}\nSetting: ${setting}\nTheme: ${effectiveTheme}`;
@@ -335,83 +334,54 @@ app.post('/generate-next', async (req, res) => {
         return res.status(400).json({ success: false, error: 'Missing sessionId or userChoice' });
     }
 
-    // <<< Retrieve session from Redis (or fallback Map) >>>
-    let session;
-    let sessionExists = false;
-    if (global.redisClient) {
-        const sessionJson = await global.redisClient.get(sessionId);
-        if (sessionJson) {
-            session = JSON.parse(sessionJson);
-            sessionExists = true;
-            // Optional: Refresh TTL on access
-            await global.redisClient.expire(sessionId, SESSION_TTL_SECONDS);
-            console.log(`Session ${sessionId} retrieved from Redis. TTL refreshed.`);
-        } else {
-             console.log(`Session ${sessionId} not found in Redis.`);
-        }
-    } else { // Fallback Map logic
-        if (global.storySessions.has(sessionId)) {
-             session = global.storySessions.get(sessionId);
-             sessionExists = true;
-             console.log(`Session ${sessionId} retrieved from fallback Map.`);
-        } else {
-             console.log(`Session ${sessionId} not found in fallback Map.`);
-        }
+    // Ensure Redis is connected (Keep this check)
+    if (!global.redisClient || global.redisClient.status !== 'ready') {
+        console.error('Redis connection is not ready');
+        return res.status(500).json({ success: false, error: 'Redis connection is not ready' });
     }
 
-    if (!sessionExists || !session) {
-      console.warn(`Invalid or expired session ID used: ${sessionId}`);
-      return res.status(404).json({ success: false, error: 'Story session not found or has expired.' });
+    // Get session data directly from Redis (No if(useRedis) check needed)
+    const sessionDataString = await global.redisClient.get(sessionId);
+    if (!sessionDataString) {
+        console.warn(`Session ${sessionId} not found in Redis.`);
+        return res.status(404).json({ success: false, error: 'Story session not found or has expired.' });
     }
-    
-    if (!session.segments) { // Validate structure after retrieval
-       console.error(`Invalid session data structure retrieved for ID: ${sessionId}`, session);
-      return res.status(500).json({ success: false, error: 'Internal server error: Invalid session data' });
-    }
+    const sessionData = JSON.parse(sessionDataString);
 
-    // Increment step count
-    session.stepCount = (session.stepCount || 1) + 1; 
-    const currentStepNumber = session.stepCount;
-    console.log(`Generating Step ${currentStepNumber} for session ${sessionId}...`);
+    console.log(`Continuing story for session ${sessionId}. Step: ${sessionData.stepCount}`);
+    const currentStoryText = sessionData.segments[sessionData.stepCount - 1].text;
+    const nextPrompt = `Continue this children's story based on the user choice.
+Story So Far:
+${currentStoryText}
 
-    const historyLimit = 3;
-    const recentSegments = session.segments.slice(-historyLimit);
-    const storyContext = recentSegments.map(seg => seg.text).join('\n...\n');
+User chose: "${userChoice}".
 
-    console.log(`Generating next segment for session ${sessionId} based on choice: "${userChoice}" using Together AI (Llama 3.3 JSON Mode/FLUX)`);
+Write the next short part (around 50-70 words). Maintain style: ${sessionData.style}, character: ${sessionData.character}, setting: ${sessionData.setting}, theme: ${sessionData.theme}.`;
 
-    const nextSegmentData = await generateStorySegment(session, storyContext, userChoice);
+    sessionData.stepCount += 1;
+    const isFinalStep = sessionData.stepCount >= 5;
 
-    // Check if nextSegmentData indicates an error occurred in helpers
-     if (!nextSegmentData || nextSegmentData.story.includes("Oops")) { // Basic check for error markers
-        console.warn('Segment generation returned fallback/error data', nextSegmentData);
-        // Fallback data will be sent back
+    const result = await generateStorySegment(sessionData, nextPrompt, isFinalStep);
+    if (result.error) {
+        throw new Error(result.error);
     }
 
-    // Add new segment to the session data
-    session.segments.push({
-      text: nextSegmentData.story,
-      imageUrl: nextSegmentData.imageUrl
+    sessionData.segments.push({
+      text: result.story,
+      imageUrl: result.imageUrl
     });
-    // session.lastUpdated = new Date(); // No longer needed with TTL
+    sessionData.lastUpdated = new Date().toISOString();
 
-    // <<< Update session in Redis/Map >>>
-    if (global.redisClient) {
-        // Use SET with EX again to update and refresh TTL
-        await global.redisClient.set(sessionId, JSON.stringify(session), 'EX', SESSION_TTL_SECONDS);
-        console.log(`Session ${sessionId} updated in Redis with segment for step ${currentStepNumber}.`);
-    } else {
-        global.storySessions.set(sessionId, session);
-        console.log(`Session ${sessionId} updated in fallback Map with segment for step ${currentStepNumber}.`);
-    }
-    
-    
+    // Store updated session data directly in Redis (No if(useRedis) check needed)
+    await global.redisClient.set(sessionId, JSON.stringify(sessionData), 'EX', SESSION_TTL_SECONDS);
+    console.log(`Session ${sessionId} updated in Redis. Step: ${sessionData.stepCount}`);
+
     res.json({
       success: true,
-      story: nextSegmentData.story,
-      imageUrl: nextSegmentData.imageUrl,
-      question: nextSegmentData.question,
-      choices: nextSegmentData.choices
+      story: result.story,
+      imageUrl: result.imageUrl,
+      question: result.question,
+      choices: result.choices
     });
 
   } catch (error) {
@@ -494,20 +464,6 @@ Write the next short part (around 50-70 words). Maintain style: ${style}, charac
 
 // Declare fallbackImageUrl globally
 const fallbackImageUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
-
-// --- Cleanup Old Sessions ---
-setInterval(() => {
-  const now = Date.now();
-  const sessionTimeout = 30 * 60 * 1000;
-  console.log(`Running session cleanup. Current sessions: ${sessionStore.size}`);
-  sessionStore.forEach((session, sessionId) => {
-    if (now - session.lastUpdated.getTime() > sessionTimeout) {
-      sessionStore.delete(sessionId);
-      console.log(`Deleted expired session: ${sessionId}`);
-    }
-  });
-}, 5 * 60 * 1000);
-
 
 // Start server
 app.listen(port, () => {
