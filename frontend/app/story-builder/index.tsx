@@ -33,6 +33,7 @@ import {
 import ChoiceCard from '../components/ChoiceCard';
 import StorySegmentComponent from '../components/StorySegment';
 import LoadingSpinner from '../components/LoadingSpinner';
+import SkeletonSegmentComponent from '../components/SkeletonSegment';
 
 // Add 'visualStyle' to the possible steps
 type StoryStep = ExistingStoryStep | 'visualStyle';
@@ -494,10 +495,6 @@ export default function StoryBuilder(): JSX.Element {
     }
   };
 
-  if (isLoading && currentStep === 'story') {
-    return <LoadingSpinner message="Creating your story..." />;
-  }
-
   return (
     <SafeAreaView style={styles.container}>
       <Stack.Screen
@@ -541,8 +538,12 @@ export default function StoryBuilder(): JSX.Element {
         ) : currentStep === 'story' && story ? (
           <View style={styles.storyRenderContainer}>
             <ScrollView ref={scrollViewRef} contentContainerStyle={styles.storyScrollContent}>
-              {story.segments && story.segments.length > 0 ? (
-                story.segments.map((segment, index) => (
+              {isLoading && (!story.segments || story.segments.length === 0) ? (
+                <View style={styles.loadingContainer}>
+                  <LoadingSpinner message="Generating your story..." />
+                </View>
+              ) : (
+                story.segments?.map((segment, index) => (
                   <StorySegmentComponent
                     key={index} 
                     segment={segment}
@@ -553,10 +554,10 @@ export default function StoryBuilder(): JSX.Element {
                     speakText={speakText} 
                   />
                 ))
-              ) : (
-                <View style={styles.loadingContainer}>
-                  <LoadingSpinner message="Generating your story..." />
-                </View>
+              )}
+              
+              {isLoading && story.segments && story.segments.length > 0 && (
+                <SkeletonSegmentComponent />
               )}
             </ScrollView>
             
@@ -609,13 +610,6 @@ export default function StoryBuilder(): JSX.Element {
         ) : null}
       </Animated.View>
 
-      {isLoading && (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4CAF50" />
-          <Text style={styles.loadingText}>Generating your story...</Text>
-        </View>
-      )}
-      
       {isRateLimited && (
         <View style={styles.rateLimitContainer}>
           <Text style={styles.rateLimitText}>
