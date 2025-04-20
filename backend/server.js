@@ -250,7 +250,7 @@ app.post('/start-story', async (req, res) => {
     const sessionId = uuidv4(); // <<< Use UUID
     // const sessionId = Date.now().toString() + Math.random().toString(36).substring(2, 7); // <<< Comment out fallback
     console.log('Created session ID:', sessionId);
-
+    
     const sessionData = {
       style,
       character,
@@ -299,7 +299,7 @@ app.post('/start-story', async (req, res) => {
          // For simplicity, we just SET with the original TTL again.
         await global.redisClient.set(sessionId, JSON.stringify(sessionData), 'EX', SESSION_TTL_SECONDS); 
         console.log(`Session ${sessionId} updated in Redis with first segment.`);
-    } else {
+      } else {
         // Update the map
         global.storySessions.set(sessionId, sessionData);
         console.log(`Session ${sessionId} updated in fallback Map with first segment.`);
@@ -405,7 +405,7 @@ app.post('/generate-next', async (req, res) => {
         console.log(`Session ${sessionId} updated in fallback Map with segment for step ${currentStepNumber}.`);
     }
     
-
+    
     res.json({
       success: true,
       story: nextSegmentData.story,

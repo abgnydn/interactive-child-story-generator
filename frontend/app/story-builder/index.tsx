@@ -30,7 +30,6 @@ import {
   API_URL
 } from '../utils/constants';
 
-import ChoiceCard from '../components/ChoiceCard';
 import StorySegmentComponent from '../components/StorySegment';
 import LoadingSpinner from '../components/LoadingSpinner';
 import SkeletonSegmentComponent from '../components/SkeletonSegment';
@@ -40,8 +39,11 @@ type StoryStep = ExistingStoryStep | 'visualStyle';
 
 const { width } = Dimensions.get('window');
 
-// Define the backend API URL
-const API_BASE_URL = 'https://interactive-child-story-generator.onrender.com';
+
+const API_BASE_URL = __DEV__ 
+  ? 'http://localhost:3000' // Use local backend in development
+  : 'https://interactive-child-story-generator.onrender.com'; // Use deployed backend in production
+
 
 export default function StoryBuilder(): JSX.Element {
   const [currentStep, setCurrentStep] = useState<StoryStep>('style');
