@@ -35,8 +35,9 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import SkeletonSegmentComponent from '../components/SkeletonSegment';
 import UserChoiceBubble from '../components/UserChoiceBubble';
 import ConfirmModal from '../components/ConfirmModal';
+import CompletionCard from '../components/CompletionCard';
 
-// Add 'visualStyle' to the possible steps
+// Revert StoryStep type - remove 'naming'
 type StoryStep = ExistingStoryStep | 'visualStyle';
 
 const { width } = Dimensions.get('window');
@@ -71,6 +72,7 @@ export default function StoryBuilder(): JSX.Element {
   const [retryCountdown, setRetryCountdown] = useState<number>(0);
   const scrollViewRef = useRef<ScrollView>(null);
   const [isConfirmModalVisible, setIsConfirmModalVisible] = useState(false);
+  const [isStoryComplete, setIsStoryComplete] = useState(false);
 
   useEffect(() => {
     lockOrientation();
@@ -236,10 +238,15 @@ export default function StoryBuilder(): JSX.Element {
           ...prev,
           [updatedStory.segments.length - 1]: 'story'
         }));
+        // Check if the story is already complete from the start
+        if (!data.question || !data.choices || data.choices.length === 0) {
+          setIsStoryComplete(true);
+        }
       } else {
-        // Set default question and choices if not provided
-        setCurrentQuestion("What should happen next?");
-        setCurrentChoices(["Explore", "Discover", "Adventure"]);
+        // Set default question and choices if not provided (should ideally indicate completion)
+        setCurrentQuestion("What should happen next?"); // Or perhaps set empty/complete here?
+        setCurrentChoices([]);
+        setIsStoryComplete(true); // Assume completion if no question/choices
         
         // Initialize the view state for the new segment
         setActiveViews(prev => ({
@@ -304,16 +311,24 @@ export default function StoryBuilder(): JSX.Element {
       const newSegment: StorySegment = {
         text: data.story || "The story continues...",
         imageUrl: data.imageUrl || undefined, 
-        // userChoiceText is NOT added here 
       };
       
-      // Append the NEW segment, set NEW question/choices
+      // Append the NEW segment
       setStory(prev => prev ? { 
         ...prev, 
         segments: [...prev.segments, newSegment] 
       } : null);
-      setCurrentQuestion(data.question || 'What should happen next?');
-      setCurrentChoices(data.choices || []);
+
+      // Check for completion and update question/choices
+      if (!data.question || !data.choices || data.choices.length === 0) {
+        setIsStoryComplete(true);
+        setCurrentQuestion('');
+        setCurrentChoices([]);
+      } else {
+        setIsStoryComplete(false); // Ensure it's false if choices are provided
+        setCurrentQuestion(data.question);
+        setCurrentChoices(data.choices);
+      }
       // ----------------------------
 
     } catch (error) {
@@ -335,9 +350,12 @@ export default function StoryBuilder(): JSX.Element {
     }
   };
 
-  // Function to handle finishing the story after confirmation
+  // Update finishStoryAndNavigate (called by back button confirm)
+  // Now saves and navigates home
   const finishStoryAndNavigate = async () => {
     if (!story) return;
+    setIsConfirmModalVisible(false); // Close the modal first
+    
     try {
       // Add a conclusion segment
       const conclusionSegment: StorySegment = {
@@ -345,11 +363,11 @@ export default function StoryBuilder(): JSX.Element {
         imageUrl: story.segments[story.segments.length - 1]?.imageUrl || "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=800" // Use last image or default
       };
       
-      // Ensure story has an ID and title
+      // Ensure story has an ID and title (use current storyTitle or default)
+      const finalTitle = storyTitle.trim() || 'My Awesome Story';
       const storyWithId = story.id ? story : { 
         ...story, 
         id: Date.now().toString(),
-        title: storyTitle || 'My Adventure Story' 
       };
       
       // Ensure segments array exists
@@ -359,20 +377,19 @@ export default function StoryBuilder(): JSX.Element {
       
       const updatedStory = {
         ...storyWithId,
+        title: finalTitle,
         segments: [...storyWithId.segments, conclusionSegment],
         lastUpdated: new Date().toISOString()
       };
       
-      console.log('Finishing story early via back button:', updatedStory);
+      console.log('Finishing story via back button:', updatedStory);
       await saveStory(updatedStory);
       
-      // Navigate to the story viewer for the finished story
-      router.replace(`/story-viewer/${updatedStory.id}`); // Use replace to prevent going back to builder
+      // Navigate to the homepage
+      router.replace('/'); // Use replace to clear history
     } catch (error) {
-      console.error('Error finishing story:', error);
+      console.error('Error finishing story via back button:', error);
       Alert.alert('Error', 'Failed to finish story. Please try again.');
-    } finally {
-      setIsConfirmModalVisible(false);
     }
   };
 
@@ -435,7 +452,46 @@ export default function StoryBuilder(): JSX.Element {
       console.log('Speech Synthesis is only implemented for web.');
     }
   };
- 
+
+  // Function to handle the save from the CompletionCard
+  const handleFinalSave = async () => {
+    if (!story) return;
+    
+    try {
+      // Add a conclusion segment
+      const conclusionSegment: StorySegment = {
+        text: "And so, the adventure came to an end. The character learned valuable lessons and created lasting memories. The end.",
+        imageUrl: story.segments[story.segments.length - 1]?.imageUrl || "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=800"
+      };
+      
+      const finalTitle = storyTitle.trim() || 'My Awesome Story';
+      const storyWithId = story.id ? story : { 
+        ...story, 
+        id: Date.now().toString(),
+      };
+      
+      if (!storyWithId.segments) {
+        storyWithId.segments = [];
+      }
+      
+      const updatedStory = {
+        ...storyWithId,
+        title: finalTitle,
+        segments: [...storyWithId.segments, conclusionSegment],
+        lastUpdated: new Date().toISOString()
+      };
+      
+      console.log('Saving final story from Completion Card:', updatedStory);
+      await saveStory(updatedStory);
+      
+      // Navigate to the homepage
+      router.replace('/'); 
+    } catch (error) {
+      console.error('Error saving final story:', error);
+      Alert.alert('Error', 'Failed to save story. Please try again.');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <Stack.Screen
@@ -450,33 +506,39 @@ export default function StoryBuilder(): JSX.Element {
             fontSize: 16, // Adjust font size if needed
           },
           headerBackVisible: false, // Explicitly hide default back button
-          // Add a back button that triggers handleCreateNew for confirmation?
-          // Or just rely on the system back button? For now, rely on system back.
-          headerLeft: () => (
-             ['story'].includes(currentStep) ? (
-              // When in story mode, back button prompts to finish
-              <TouchableOpacity onPress={promptFinishStory} style={{ marginLeft: 10 }}>
-                <MaterialIcons name="arrow-back" size={24} color="#333" />
-              </TouchableOpacity>
-            ) : ['character', 'setting', 'theme', 'visualStyle'].includes(currentStep) ? (
-               <TouchableOpacity onPress={() => {
-                 // Go back one step logic
-                 const previousStepMap: Record<StoryStep, StoryStep> = {
-                   character: 'style',
-                   setting: 'character',
-                   theme: 'setting',
-                   visualStyle: 'theme',
-                   style: 'style', // Cannot go back from style
-                   story: 'visualStyle', // Should not happen via this button
-                   complete: 'story', // Should not happen via this button
-                 };
-                 setSelectedChoices(prev => prev.slice(0, -1));
-                 setCurrentStep(previousStepMap[currentStep]);
-               }} style={{ marginLeft: 10 }}>
-                <MaterialIcons name="arrow-back" size={24} color="#333" />
-              </TouchableOpacity>
-            ) : null // No back button on the first step ('style')
-          ),
+          headerLeft: () => {
+            if (currentStep === 'story') {
+              // When in story mode, back button prompts to finish (which now saves and goes home)
+              return (
+                <TouchableOpacity onPress={promptFinishStory} style={{ marginLeft: 10 }}>
+                  <MaterialIcons name="arrow-back" size={24} color="#333" />
+                </TouchableOpacity>
+              );
+            } else if (['character', 'setting', 'theme', 'visualStyle'].includes(currentStep)) {
+               // When selecting choices (after first), go back one step
+               return (
+                 <TouchableOpacity onPress={() => {
+                   // Revert previousStepMap - remove naming
+                   const previousStepMap: Record<StoryStep, StoryStep> = {
+                     character: 'style',
+                     setting: 'character',
+                     theme: 'setting',
+                     visualStyle: 'theme',
+                     style: 'style', 
+                     story: 'visualStyle',
+                     complete: 'story', 
+                   };
+                   setSelectedChoices(prev => prev.slice(0, -1));
+                   setCurrentStep(previousStepMap[currentStep]);
+                 }} style={{ marginLeft: 10 }}>
+                  <MaterialIcons name="arrow-back" size={24} color="#333" />
+                </TouchableOpacity>
+               );
+            } else {
+              // No back button on the first step ('style')
+              return null;
+            }
+          },
         }}
       />
 
@@ -542,37 +604,16 @@ export default function StoryBuilder(): JSX.Element {
               {isLoading && story.segments && story.segments.length > 0 && (
                 <SkeletonSegmentComponent />
               )}
+              
+              {/* Render Completion Card ONLY when story is complete and not loading */} 
+              {!isLoading && currentStep === 'story' && isStoryComplete && (
+                <CompletionCard 
+                  storyTitle={storyTitle}
+                  onTitleChange={setStoryTitle}
+                  onSave={handleFinalSave}
+                />
+              )}
             </ScrollView>
-            
-            {/* Button container removed */}
-          </View>
-        ) : currentStep === 'complete' ? (
-          <View style={styles.completeContainer}>
-            <View style={styles.titleInputContainer}>
-              <TextInput
-                style={styles.titleInput}
-                placeholder="My Adventure Story"
-                value={storyTitle}
-                onChangeText={setStoryTitle}
-                placeholderTextColor="#999"
-              />
-              <TouchableOpacity
-                style={styles.saveButton}
-                onPress={() => {
-                  if (story) {
-                    const updatedStory = {
-                      ...story,
-                      title: storyTitle || 'My Adventure Story'
-                    };
-                    saveStory(updatedStory);
-                    router.push(`/story-viewer/${story.id}`);
-                  }
-                }}
-              >
-                <MaterialIcons name="save" size={24} color="white" />
-                <Text style={styles.buttonText}>Save Story</Text>
-              </TouchableOpacity>
-            </View>
           </View>
         ) : null}
       </Animated.View>
@@ -594,8 +635,8 @@ export default function StoryBuilder(): JSX.Element {
                 startStory();
               } else {
                 // Need the last choice to retry handleChoice correctly.
-                // This retry logic might need refinement. For now, just try starting again.
-                startStory(); 
+                // For now, just prompt to finish again if they retry during story
+                promptFinishStory();
               }
             }}
           >
@@ -733,45 +774,7 @@ const styles = StyleSheet.create({
   storyScrollContent: {
     paddingHorizontal: 16,
     paddingTop: 16,
-    paddingBottom: 30, // Adjusted padding since buttons are removed
-  },
-  // buttonContainer style is removed as the container is deleted
-  // finishButton style is removed
-  // newStoryButton style is removed
-  completeContainer: {
-    flex: 1,
-    padding: 16,
-    justifyContent: 'center',
-  },
-  titleInputContainer: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  titleInput: {
-    borderWidth: 1,
-    borderColor: '#DDD',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 18,
-    color: '#333',
-    marginBottom: 16,
-  },
-  saveButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#4CAF50',
-    borderRadius: 12,
-    padding: 16,
+    paddingBottom: 30, 
   },
   loadingContainer: {
     flex: 1,
@@ -809,5 +812,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  // stepTitle style is removed (renamed to stepQuestionTitle)
-}); 
+  titleInput: {
+    borderWidth: 1,
+    borderColor: '#DDD',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 18,
+    color: '#333',
+    marginBottom: 16,
+  },
+  saveButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#4CAF50',
+    borderRadius: 12,
+    padding: 16,
+  },
+});

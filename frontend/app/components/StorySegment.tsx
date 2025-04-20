@@ -20,7 +20,7 @@ export default function StorySegmentComponent({
   choices,
   onChoiceSelect,
   speakText,
-}: StorySegmentProps): JSX.Element {
+}: StorySegmentProps): JSX.Element | null {
   const [isImageFullScreen, setIsImageFullScreen] = useState(false);
 
   // Function to check if a string is a base64 image
@@ -68,15 +68,14 @@ export default function StorySegmentComponent({
 
   // Ensure segment exists and has required properties
   if (!segment) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>Story segment not available</Text>
-      </View>
-    );
+    console.warn('StorySegmentComponent received null or undefined segment.');
+    return null; // Return null to render nothing if segment is invalid
   }
+  
+  // If segment exists, but text is missing, provide a placeholder
   if (!segment.text) {
-     // Still render container for potential image/question even if text is missing briefly
-     segment.text = "..."; // Placeholder or handle appropriately
+     console.warn('StorySegmentComponent received segment with missing text.');
+     segment.text = "[Story text missing]"; 
   }
 
   const imageSource = getImageSource(segment.imageUrl);
