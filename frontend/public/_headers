@@ -1,0 +1,9 @@
+# Set correct MIME types for font files
+/assets/*.ttf
+  Content-Type: font/ttf
+/assets/*.otf
+  Content-Type: font/otf
+/assets/*.woff
+  Content-Type: font/woff
+/assets/*.woff2
+  Content-Type: font/woff2 
