@@ -1,5 +1,5 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
+import { useFonts, Quicksand_400Regular, Quicksand_500Medium, Quicksand_700Bold } from '@expo-google-fonts/quicksand';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -13,18 +13,24 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  const [loaded] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+  const [fontsLoaded, fontError] = useFonts({
+    Quicksand_400Regular,
+    Quicksand_500Medium,
+    Quicksand_700Bold,
   });
 
   useEffect(() => {
-    if (loaded) {
+    if (fontsLoaded || fontError) {
       SplashScreen.hideAsync();
     }
-  }, [loaded]);
+  }, [fontsLoaded, fontError]);
 
-  if (!loaded) {
+  if (!fontsLoaded && !fontError) {
     return null;
+  }
+
+  if (fontError) {
+    console.error("Error loading fonts: ", fontError);
   }
 
   return (

@@ -16,8 +16,8 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
   visible,
   title,
   message,
-  confirmText = 'Confirm',
-  cancelText = 'Cancel',
+  confirmText = 'Yes',
+  cancelText = 'No',
   onConfirm,
   onCancel,
 }) => {
@@ -38,14 +38,14 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
               style={[styles.button, styles.cancelButton]}
               onPress={onCancel}
             >
-              <MaterialIcons name="cancel" size={20} color="#333" />
+              <MaterialIcons name="close" size={22} color="#555" />
               <Text style={[styles.buttonText, styles.cancelButtonText]}>{cancelText}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.button, styles.confirmButton]}
               onPress={onConfirm}
             >
-              <MaterialIcons name="check-circle" size={20} color="white" />
+              <MaterialIcons name="check" size={22} color="white" />
               <Text style={styles.buttonText}>{confirmText}</Text>
             </TouchableOpacity>
           </View>
@@ -60,13 +60,14 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent background
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
   modalView: {
     margin: 20,
     backgroundColor: 'white',
     borderRadius: 20,
-    padding: 35,
+    paddingVertical: 30,
+    paddingHorizontal: 25,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: {
@@ -76,42 +77,44 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
-    width: '85%', // Adjust width as needed
+    width: '88%',
+    maxWidth: 400,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
     marginBottom: 15,
     textAlign: 'center',
     color: '#333',
   },
   modalText: {
-    marginBottom: 25,
+    marginBottom: 30,
     textAlign: 'center',
-    fontSize: 16,
+    fontSize: 17,
     color: '#555',
-    lineHeight: 22,
+    lineHeight: 24,
   },
   buttonContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between', // Space out buttons
-    width: '100%', // Ensure container takes full width
+    justifyContent: 'space-around',
+    width: '100%',
   },
   button: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 18, // Adjust padding
+    borderRadius: 15,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
     elevation: 2,
-    minWidth: 120, // Ensure buttons have minimum width
+    minWidth: 130,
+    marginHorizontal: 5,
   },
   confirmButton: {
-    backgroundColor: '#4CAF50', // Green for confirm
+    backgroundColor: '#4CAF50',
   },
   cancelButton: {
-    backgroundColor: '#f0f0f0', // Light grey for cancel
+    backgroundColor: '#f0f0f0',
     borderWidth: 1,
     borderColor: '#ccc',
   },
@@ -120,10 +123,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
     marginLeft: 8,
-    fontSize: 16,
+    fontSize: 17,
   },
   cancelButtonText: {
-    color: '#333', // Dark text for cancel button
+    color: '#555',
   },
 });
 

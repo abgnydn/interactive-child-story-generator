@@ -21,7 +21,6 @@ export default function Home() {
               <Text style={[styles.imageTitle, { color: '#4CAF50' }]}>Make a New Story</Text>
             </View>
             <View style={styles.cardContent}>
-              <Text style={styles.cardTitle}>Make a New Story</Text>
               <Text style={styles.cardDescription}>
                 Let's make a fun new story! Pick how it starts.
               </Text>
@@ -40,7 +39,6 @@ export default function Home() {
               <Text style={[styles.imageTitle, { color: '#FF9800' }]}>Saved Stories</Text>
             </View>
             <View style={styles.cardContent}>
-              <Text style={styles.cardTitle}>Saved Stories</Text>
               <Text style={styles.cardDescription}>
                 Read the stories you saved.
               </Text>
@@ -76,20 +74,21 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
+    fontSize: 30,
     color: '#333',
     marginBottom: 4,
     textAlign: 'center',
+    fontFamily: 'Quicksand_700Bold',
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 17,
     color: '#666',
     textAlign: 'center',
+    fontFamily: 'Quicksand_500Medium',
   },
   content: {
     flex: 1,
-    gap: 12,
+    gap: 16,
   },
   card: {
     backgroundColor: 'white',
@@ -113,32 +112,28 @@ const styles = StyleSheet.create({
   },
   imageTitle: {
     fontSize: 22,
-    fontWeight: 'bold',
     marginTop: 12,
     textAlign: 'center',
+    fontFamily: 'Quicksand_700Bold',
   },
   cardContent: {
-    padding: 12,
-  },
-  cardTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
+    padding: 16,
   },
   cardDescription: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#666',
-    lineHeight: 20,
-    marginBottom: 12,
+    lineHeight: 22,
+    marginBottom: 16,
+    textAlign: 'center',
+    fontFamily: 'Quicksand_500Medium',
   },
   button: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#4CAF50',
-    padding: 10,
-    borderRadius: 10,
+    padding: 12,
+    borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -153,8 +148,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FF9800',
-    padding: 10,
-    borderRadius: 10,
+    padding: 12,
+    borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -167,7 +162,7 @@ const styles = StyleSheet.create({
   buttonText: {
     color: 'white',
     fontSize: 16,
-    fontWeight: 'bold',
     marginLeft: 8,
+    fontFamily: 'Quicksand_700Bold',
   },
 }); 

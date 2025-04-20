@@ -494,8 +494,8 @@ export default function StoryBuilder(): JSX.Element {
           },
           headerTintColor: '#6A0DAD', // Updated tint color
           headerTitleStyle: {
-            fontWeight: 'bold',
-            fontSize: 16, // Keeping font size
+            fontFamily: 'Quicksand_700Bold', // Apply font to header
+            fontSize: 18, // Adjust if needed
           },
           headerBackVisible: false, // Explicitly hide default back button
           headerLeft: () => {
@@ -547,17 +547,27 @@ export default function StoryBuilder(): JSX.Element {
             <ScrollView contentContainerStyle={styles.choicesGrid}>
               {getCurrentChoices().map((choice) => (
                 <View key={choice.id} style={styles.card}>
-                  <View style={[styles.cardImage, { backgroundColor: choice.color + '20' }]}>
-                    <MaterialIcons name={choice.icon} size={56} color={choice.color} /> 
-                    <Text style={[styles.imageTitle, { color: choice.color }]}>{choice.name}</Text>
+                  <View style={styles.cardImageContainer}>
+                     {choice.imageUrl ? (
+                       <Image 
+                         source={{ uri: choice.imageUrl }}
+                         style={styles.cardImage}
+                         resizeMode="cover" 
+                       />
+                     ) : (
+                       <View style={[styles.cardImage, { backgroundColor: choice.color + '20', justifyContent: 'center', alignItems: 'center' }]}>
+                         <MaterialIcons name="image-not-supported" size={40} color={choice.color || '#ccc'} /> 
+                       </View>
+                     )}
                   </View>
                   <View style={styles.cardContent}>
+                    <Text style={[styles.imageTitle, { color: choice.color }]}>{choice.name}</Text>
                     <Text style={styles.cardDescription}>{choice.description}</Text>
                     <TouchableOpacity
                       style={[styles.button, { backgroundColor: choice.color }]}
                       onPress={() => handleStyleChoice(choice)}
                     >
-                      <MaterialIcons name="check-circle-outline" size={20} color="white" />
+                      <MaterialIcons name="check-circle-outline" size={22} color="white" />
                       <Text style={styles.buttonText}>Choose This!</Text>
                     </TouchableOpacity>
                   </View>
@@ -631,9 +641,9 @@ export default function StoryBuilder(): JSX.Element {
 
       <ConfirmModal
         visible={isConfirmModalVisible}
-        title="Finish Story?"
-        message="Are you sure you want to finish the story now? This will add a final conclusion."
-        confirmText="Finish Story"
+        title="All Done?"
+        message="Want to finish the story now?"
+        confirmText="Finish"
         cancelText="Keep Going"
         onConfirm={finishStoryAndNavigate}
         onCancel={() => setIsConfirmModalVisible(false)}
@@ -675,67 +685,75 @@ const styles = StyleSheet.create({
     color: '#333',
     textAlign: 'center',
     marginVertical: 15,
+    fontFamily: 'Quicksand_700Bold', // Apply new font
   },
   choicesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-around',
-    paddingHorizontal: 10,
+    paddingHorizontal: 5,
     paddingBottom: 20,
   },
   card: {
-    width: '46%',
+    width: '47%',
     backgroundColor: 'white',
-    borderRadius: 15,
-    marginBottom: 15,
+    borderRadius: 18,
+    marginBottom: 18,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 5,
-    elevation: 3,
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  cardImageContainer: {
+    width: '100%',
+    height: 120,
+    backgroundColor: '#f0f0f0',
   },
   cardImage: {
-    paddingVertical: 20,
-    alignItems: 'center',
-    borderTopLeftRadius: 15,
-    borderTopRightRadius: 15,
+    width: '100%',
+    height: '100%',
   },
   imageTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: 'bold',
-    marginTop: 16,
+    marginTop: 8,
+    marginBottom: 4,
     textAlign: 'center',
+    fontFamily: 'Quicksand_700Bold',
+    color: '#444',
   },
   cardContent: {
-    padding: 15, // Reduced padding slightly
-  },
-  cardTitle: { // This style seems unused, maybe remove later?
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
+    padding: 12,
+    paddingTop: 0,
+    alignItems: 'center',
   },
   cardDescription: {
-    fontSize: 14, // Reduced font size slightly
+    fontSize: 14,
     color: '#666',
-    lineHeight: 20, // Adjusted line height
-    marginBottom: 12, // Reduced margin
-    minHeight: 60, // Ensure minimum height for description text
+    lineHeight: 20,
+    marginBottom: 15,
+    minHeight: 40,
+    textAlign: 'center',
+    fontFamily: 'Quicksand_500Medium',
   },
   button: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12, // Adjusted padding
-    paddingHorizontal: 16,
-    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderRadius: 15,
+    width: '90%',
+    alignSelf: 'center',
   },
   buttonText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: 'bold',
     marginLeft: 8,
+    fontFamily: 'Quicksand_700Bold',
   },
   titleContainer: { // This style seems unused, maybe remove later?
     padding: 16,
