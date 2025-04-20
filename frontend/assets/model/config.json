@@ -1,0 +1,14 @@
+{
+  "model_name": "bert-mini",
+  "version": "1.0.0",
+  "vocab_size": 30522,
+  "hidden_size": 256,
+  "num_hidden_layers": 4,
+  "num_attention_heads": 4,
+  "intermediate_size": 1024,
+  "max_position_embeddings": 128,
+  "type_vocab_size": 2,
+  "vocab_file": "vocab.json",
+  "model_file": "model.json",
+  "weights_file": "weights.bin"
+} 
