@@ -4,6 +4,8 @@ import express from 'express';
 import cors from 'cors';
 // Use Together SDK for text and images
 import Together from 'together-ai';
+import Redis from 'ioredis'; // <<< Import ioredis
+import { v4 as uuidv4 } from 'uuid'; // <<< Uncomment UUID import
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -25,8 +27,40 @@ console.log(`TOGETHER_API_KEY loaded: ${togetherApiKey ? '...' + togetherApiKey.
 // Initialize Together client (used for both text and images)
 const together = new Together({ apiKey: togetherApiKey });
 
-// --- In-Memory Session Storage ---
-const storySessions = new Map();
+// --- Redis Session Storage Setup ---
+// const storySessions = new Map(); // <<< Remove in-memory Map
+
+// Use REDIS_URL from environment variables (provided by Render)
+const redisUrl = process.env.REDIS_URL;
+if (!redisUrl) {
+  console.warn('Warning: REDIS_URL is not set. Session storage will not be persistent. Falling back to basic in-memory store for local dev (NOT RECOMMENDED FOR PRODUCTION).');
+  // Provide a simple Map fallback for local development if Redis isn't configured
+  // NOTE: This fallback WILL lose data on server restarts.
+  global.storySessions = new Map(); 
+  global.redisClient = null; // No Redis client
+} else {
+  console.log('Connecting to Redis...');
+  const redis = new Redis(redisUrl, {
+    // Optional: Configure TLS if needed for your Redis provider
+    // tls: { rejectUnauthorized: false }, 
+    maxRetriesPerRequest: 3, 
+    enableReadyCheck: true,
+    showFriendlyErrorStack: process.env.NODE_ENV !== 'production' // More detail in dev
+  });
+
+  redis.on('connect', () => console.log('Redis connected successfully.'));
+  redis.on('error', (err) => console.error('Redis connection error:', err));
+  redis.on('reconnecting', () => console.log('Redis reconnecting...'));
+  redis.on('end', () => console.log('Redis connection ended.'));
+
+  global.redisClient = redis; // Make client available globally (or pass via req context)
+  global.storySessions = null; // Clear the Map reference if Redis is used
+}
+
+// Helper to get the active session storage (Redis or fallback Map)
+// This avoids needing `global.` everywhere but keeps the fallback logic
+const sessionStore = global.redisClient || global.storySessions; 
+const SESSION_TTL_SECONDS = 60 * 60 * 2; // 2 hours session expiry
 
 // --- Helper Functions ---
 
@@ -209,51 +243,66 @@ app.post('/start-story', async (req, res) => {
     }
     const effectiveTheme = theme || '';
 
-    const sessionId = Date.now().toString() + Math.random().toString(36).substring(2, 7);
+    // Use UUID for session ID generation (ensure uuid is installed: npm install uuid @types/uuid)
+    // If you haven't installed uuid yet, run: npm install uuid @types/uuid
+    // Then uncomment the next two lines and comment out the Date.now line
+    // import { v4 as uuidv4 } from 'uuid'; 
+    const sessionId = uuidv4(); // <<< Use UUID
+    // const sessionId = Date.now().toString() + Math.random().toString(36).substring(2, 7); // <<< Comment out fallback
     console.log('Created session ID:', sessionId);
 
-    storySessions.set(sessionId, {
+    const sessionData = {
       style,
       character,
       setting,
       theme: effectiveTheme,
       visualStylePrompt,
-      stepCount: 1, // <<< Initialize step count
+      stepCount: 1, 
       segments: [],
-      lastUpdated: new Date()
-    });
+      // lastUpdated: new Date() // Less critical with TTL, Redis handles expiry
+    };
+
+    // <<< Store session in Redis (or fallback Map) >>>
+    if (global.redisClient) {
+        // Use Redis SET with EX (expiry in seconds)
+        await global.redisClient.set(sessionId, JSON.stringify(sessionData), 'EX', SESSION_TTL_SECONDS);
+        console.log(`Session ${sessionId} stored in Redis with TTL ${SESSION_TTL_SECONDS}s.`);
+    } else {
+        // Fallback to Map (no TTL)
+        global.storySessions.set(sessionId, sessionData);
+        console.log(`Session ${sessionId} stored in fallback Map (no TTL).`);
+    }
 
     console.log('Generating first story segment (Step 1) using Together AI...');
-    const initialPrompt = `Start a children's story (around 50-70 words, simple language) with:
-Style: ${style}
-Character: ${character}
-Setting: ${setting}
-Theme: ${effectiveTheme}`;
+    const initialPrompt = `Start a children's story (around 50-70 words, simple language) with:\nStyle: ${style}\nCharacter: ${character}\nSetting: ${setting}\nTheme: ${effectiveTheme}`;
 
     console.log('Using prompt for Together AI text generation:', initialPrompt);
 
     const storyData = await generateText(initialPrompt);
 
     // Check if storyData has fallback content due to error
-    if (!storyData || storyData.story.includes("[")) { // Basic check for error markers
+    if (!storyData || storyData.story.includes("Oops")) { // Basic check for error markers
         console.warn('Text generation returned fallback/error data', storyData);
-        // Optionally return an error to the client or use defaults
     }
 
     console.log('Generating first segment image using Together AI...');
     const firstImageUrl = await generateImage(storyData.story, visualStylePrompt);
 
-    const session = storySessions.get(sessionId);
-    if (session) {
-        session.segments.push({
-            text: storyData.story,
-            imageUrl: firstImageUrl
-        });
-        storySessions.set(sessionId, session);
-        console.log('Session updated with first segment.');
+    // <<< Update session in Redis/Map with first segment >>>
+    sessionData.segments.push({ // Update the local object first
+        text: storyData.story,
+        imageUrl: firstImageUrl
+    });
+    if (global.redisClient) {
+         // Re-set the updated data in Redis, keeping the TTL
+         // Using SET KEEPTTL (requires Redis 6.0+) would be more efficient if available
+         // For simplicity, we just SET with the original TTL again.
+        await global.redisClient.set(sessionId, JSON.stringify(sessionData), 'EX', SESSION_TTL_SECONDS); 
+        console.log(`Session ${sessionId} updated in Redis with first segment.`);
     } else {
-        console.error(`Session ${sessionId} unexpectedly missing after generation.`);
-        return res.status(500).json({ success: false, error: 'Session error after generation' });
+        // Update the map
+        global.storySessions.set(sessionId, sessionData);
+        console.log(`Session ${sessionId} updated in fallback Map with first segment.`);
     }
 
     console.log('Sending response to client for Step 1');
@@ -280,20 +329,43 @@ app.post('/generate-next', async (req, res) => {
   try {
     const { sessionId, userChoice } = req.body;
     console.log(`Received /generate-next request with sessionId: ${sessionId}, userChoice: ${userChoice}`);
-    console.log(`Current known session IDs: ${Array.from(storySessions.keys()).join(', ') || 'None'}`);
 
     if (!sessionId || !userChoice) {
         console.warn('/generate-next missing sessionId or userChoice');
         return res.status(400).json({ success: false, error: 'Missing sessionId or userChoice' });
     }
-    if (!storySessions.has(sessionId)) {
-      console.warn(`Attempt to use invalid or expired session ID: ${sessionId}`);
-      return res.status(404).json({ success: false, error: 'Story session not found.' });
+
+    // <<< Retrieve session from Redis (or fallback Map) >>>
+    let session;
+    let sessionExists = false;
+    if (global.redisClient) {
+        const sessionJson = await global.redisClient.get(sessionId);
+        if (sessionJson) {
+            session = JSON.parse(sessionJson);
+            sessionExists = true;
+            // Optional: Refresh TTL on access
+            await global.redisClient.expire(sessionId, SESSION_TTL_SECONDS);
+            console.log(`Session ${sessionId} retrieved from Redis. TTL refreshed.`);
+        } else {
+             console.log(`Session ${sessionId} not found in Redis.`);
+        }
+    } else { // Fallback Map logic
+        if (global.storySessions.has(sessionId)) {
+             session = global.storySessions.get(sessionId);
+             sessionExists = true;
+             console.log(`Session ${sessionId} retrieved from fallback Map.`);
+        } else {
+             console.log(`Session ${sessionId} not found in fallback Map.`);
+        }
     }
 
-    const session = storySessions.get(sessionId);
-    if (!session || !session.segments) {
-       console.error(`Invalid session data structure for ID: ${sessionId}`);
+    if (!sessionExists || !session) {
+      console.warn(`Invalid or expired session ID used: ${sessionId}`);
+      return res.status(404).json({ success: false, error: 'Story session not found or has expired.' });
+    }
+    
+    if (!session.segments) { // Validate structure after retrieval
+       console.error(`Invalid session data structure retrieved for ID: ${sessionId}`, session);
       return res.status(500).json({ success: false, error: 'Internal server error: Invalid session data' });
     }
 
@@ -311,19 +383,28 @@ app.post('/generate-next', async (req, res) => {
     const nextSegmentData = await generateStorySegment(session, storyContext, userChoice);
 
     // Check if nextSegmentData indicates an error occurred in helpers
-     if (!nextSegmentData || nextSegmentData.story.includes("[")) { // Basic check for error markers
+     if (!nextSegmentData || nextSegmentData.story.includes("Oops")) { // Basic check for error markers
         console.warn('Segment generation returned fallback/error data', nextSegmentData);
-        // Decide how to handle - maybe return 500 or specific error message?
-        // For now, just send the fallback data back
+        // Fallback data will be sent back
     }
 
+    // Add new segment to the session data
     session.segments.push({
       text: nextSegmentData.story,
       imageUrl: nextSegmentData.imageUrl
     });
-    session.lastUpdated = new Date();
-    storySessions.set(sessionId, session);
-    console.log(`Session ${sessionId} updated with segment for step ${currentStepNumber}.`);
+    // session.lastUpdated = new Date(); // No longer needed with TTL
+
+    // <<< Update session in Redis/Map >>>
+    if (global.redisClient) {
+        // Use SET with EX again to update and refresh TTL
+        await global.redisClient.set(sessionId, JSON.stringify(session), 'EX', SESSION_TTL_SECONDS);
+        console.log(`Session ${sessionId} updated in Redis with segment for step ${currentStepNumber}.`);
+    } else {
+        global.storySessions.set(sessionId, session);
+        console.log(`Session ${sessionId} updated in fallback Map with segment for step ${currentStepNumber}.`);
+    }
+    
 
     res.json({
       success: true,
@@ -334,7 +415,9 @@ app.post('/generate-next', async (req, res) => {
     });
 
   } catch (error) {
-    console.error(`Error in /generate-next for session ${req.body?.sessionId}:`, error);
+    // Log error with session ID if possible
+    const sid = req.body?.sessionId || 'unknown';
+    console.error(`Error in /generate-next for session ${sid}:`, error);
     res.status(500).json({
       success: false,
       error: 'Failed to generate next part of the story due to an internal server error.'
@@ -356,8 +439,8 @@ async function generateStorySegment(session, context, userChoice) {
     const continuationPrompt = isFinalStep ?
         `Conclude this children's story based on the user's last choice.
 Story So Far:
-${context}
-
+        ${context}
+        
 User chose: "${userChoice}".
 
 Write a short concluding paragraph (around 50-70 words). Maintain style: ${style}, character: ${character}, setting: ${setting}, theme: ${theme}.`
@@ -416,10 +499,10 @@ const fallbackImageUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB
 setInterval(() => {
   const now = Date.now();
   const sessionTimeout = 30 * 60 * 1000;
-  console.log(`Running session cleanup. Current sessions: ${storySessions.size}`);
-  storySessions.forEach((session, sessionId) => {
+  console.log(`Running session cleanup. Current sessions: ${sessionStore.size}`);
+  sessionStore.forEach((session, sessionId) => {
     if (now - session.lastUpdated.getTime() > sessionTimeout) {
-      storySessions.delete(sessionId);
+      sessionStore.delete(sessionId);
       console.log(`Deleted expired session: ${sessionId}`);
     }
   });
