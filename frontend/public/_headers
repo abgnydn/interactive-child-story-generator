@@ -1,9 +1,13 @@
-# Set correct MIME types for font files
+# Set correct MIME types and disable caching for font files
 /assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/*.ttf
   Content-Type: font/ttf
+  Cache-Control: no-store
 /assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/*.otf
   Content-Type: font/otf
+  Cache-Control: no-store
 /assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/*.woff
   Content-Type: font/woff
+  Cache-Control: no-store
 /assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/*.woff2
-  Content-Type: font/woff2 
+  Content-Type: font/woff2
+  Cache-Control: no-store 
