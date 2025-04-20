@@ -7,10 +7,8 @@ import FullScreenImage from './FullScreenImage';
 interface StorySegmentProps {
   segment: StorySegmentType;
   index: number;
-  isQuestionView: boolean;
   question?: string;
   choices?: string[];
-  onToggleView: () => void;
   onChoiceSelect?: (choice: string) => void;
   speakText?: (text: string) => void;
 }
@@ -18,10 +16,8 @@ interface StorySegmentProps {
 export default function StorySegmentComponent({
   segment,
   index,
-  isQuestionView,
   question,
   choices,
-  onToggleView,
   onChoiceSelect,
   speakText,
 }: StorySegmentProps): JSX.Element {
@@ -78,20 +74,16 @@ export default function StorySegmentComponent({
       </View>
     );
   }
-
-  // Ensure segment has text property
   if (!segment.text) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>Story text not available</Text>
-      </View>
-    );
+     // Still render container for potential image/question even if text is missing briefly
+     segment.text = "..."; // Placeholder or handle appropriately
   }
 
   const imageSource = getImageSource(segment.imageUrl);
 
   return (
-    <View style={styles.container}>
+    <View style={styles.segmentOuterContainer}> 
+      {/* FullScreenImage modal */} 
       {imageSource && (
         <FullScreenImage
           visible={isImageFullScreen}
@@ -99,53 +91,24 @@ export default function StorySegmentComponent({
           onClose={() => setIsImageFullScreen(false)}
         />
       )}
-      {isQuestionView ? (
-        <View style={styles.questionContainer}>
-          <View style={styles.textBubble}>
-            <Text style={styles.questionText}>{question || "What should happen next?"}</Text>
-          </View>
-          
-          <View style={styles.choicesContainer}>
-            {choices && choices.length > 0 ? (
-              choices.map((choice, choiceIndex) => (
-                <TouchableOpacity
-                  key={choiceIndex}
-                  style={styles.choiceButton}
-                  onPress={() => onChoiceSelect?.(choice)}
-                >
-                  <Text style={styles.choiceText}>{choice}</Text>
-                </TouchableOpacity>
-              ))
-            ) : (
-              <Text style={styles.errorText}>No choices available</Text>
-            )}
-          </View>
-          
+
+      {/* Always render story content */} 
+      <View style={styles.storyContainer}>
+        {imageSource && (
           <TouchableOpacity
-            style={styles.toggleButton}
-            onPress={onToggleView}
+            style={styles.imageWrapper}
+            onPress={() => setIsImageFullScreen(true)}
           >
-            <MaterialIcons name="book" size={24} color="white" />
-            <Text style={styles.toggleButtonText}>Back to Story</Text>
+            <Image
+              source={imageSource}
+              style={styles.storyImage}
+              resizeMode="cover"
+              onError={(e) => console.log('Image loading error:', e.nativeEvent.error)}
+            />
           </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={styles.storyContainer}>
-          {imageSource && (
-            <TouchableOpacity 
-              style={styles.imageWrapper}
-              onPress={() => setIsImageFullScreen(true)}
-            >
-              <Image
-                source={imageSource}
-                style={styles.storyImage}
-                resizeMode="cover"
-                onError={(e) => console.log('Image loading error:', e.nativeEvent.error)}
-              />
-            </TouchableOpacity>
-          )}
-          
-          <View style={styles.textContainer}>
+        )}
+        
+        <View style={styles.textContainer}>
             <View style={styles.textAndSpeakerContainer}>
               <View style={styles.textBubble}>
                 <ScrollView style={styles.scrollViewStyle}>
@@ -161,14 +124,26 @@ export default function StorySegmentComponent({
                 </TouchableOpacity>
               )}
             </View>
-            
-            <TouchableOpacity
-              style={styles.toggleButton}
-              onPress={onToggleView}
-            >
-              <MaterialIcons name="help" size={24} color="white" />
-              <Text style={styles.toggleButtonText}>What happens next?</Text>
-            </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Conditionally render Question and Choices below the story content */} 
+      {question && choices && choices.length > 0 && (
+        <View style={styles.questionChoicesContainer}>
+          <View style={styles.questionBubble}>
+            <Text style={styles.questionText}>{question}</Text>
+          </View>
+          
+          <View style={styles.choicesGridContainer}> 
+            {choices.map((choice, choiceIndex) => (
+              <TouchableOpacity
+                key={choiceIndex}
+                style={styles.choiceButton}
+                onPress={() => onChoiceSelect?.(choice)} 
+              >
+                <Text style={styles.choiceText}>{choice}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
       )}
@@ -177,129 +152,119 @@ export default function StorySegmentComponent({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    width: '100%',
-    marginBottom: 10,
-    borderRadius: 20,
-    overflow: 'hidden',
-    backgroundColor: 'white',
+  segmentOuterContainer: {
+    marginBottom: 20, 
+    backgroundColor: '#f9f9f9',
+    borderRadius: 15,
+    padding: 15,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  container: {
   },
   storyContainer: {
     width: '100%',
-    height: '100%',
     flexDirection: 'column',
+    marginBottom: 25,
   },
   imageWrapper: {
     width: '100%',
     height: 250,
     overflow: 'hidden',
+    borderRadius: 10,
+    marginBottom: 15,
   },
   storyImage: {
     width: '100%',
     height: '100%',
   },
   textContainer: {
-    padding: 12,
-    alignItems: 'center',
-    flex: 1,
-  },
-  questionContainer: {
-    padding: 16,
+    paddingHorizontal: 5,
     alignItems: 'center',
   },
   textAndSpeakerContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     width: '100%',
-    marginBottom: 8,
   },
   textBubble: {
-    backgroundColor: '#FFF8E1',
-    borderRadius: 20,
-    padding: 12,
+    backgroundColor: '#ffffff',
+    borderRadius: 15,
+    padding: 15,
     width: 'auto',
     flex: 1,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 3,
+    elevation: 2,
     maxHeight: 250,
     marginRight: 8,
-  },
-  scrollViewStyle: {
-    // maxHeight: 230,
+    borderColor: '#eee',
+    borderWidth: 1,
   },
   storyText: {
-    fontSize: 18,
-    lineHeight: 26,
-    color: '#333',
-    textAlign: 'left',
-  },
-  questionText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    lineHeight: 26,
-    color: '#333',
-    textAlign: 'center',
-  },
-  choicesContainer: {
-    width: '100%',
-    marginBottom: 12,
-  },
-  choiceButton: {
-    backgroundColor: '#FFF8E1',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  choiceText: {
     fontSize: 16,
+    lineHeight: 24,
     color: '#333',
-    textAlign: 'center',
-  },
-  toggleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FF9800',
-    borderRadius: 12,
-    padding: 10,
-    marginTop: 6,
-  },
-  toggleButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
-  },
-  errorText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: 'red',
-    textAlign: 'center',
-    marginTop: 20,
   },
   speakerButton: {
     padding: 5,
-    justifyContent: 'center',
-    alignSelf: 'center',
+    marginTop: 10,
+    alignSelf: 'flex-start',
   },
+  questionChoicesContainer: {
+    marginTop: 10,
+    paddingHorizontal: 10,
+  },
+  questionBubble: {
+    backgroundColor: '#e3f2fd',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    marginBottom: 20,
+    alignSelf: 'stretch',
+  },
+  questionText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1565c0',
+    textAlign: 'center',
+  },
+  choicesGridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-evenly',
+    alignItems: 'center',
+  },
+  choiceButton: {
+    backgroundColor: '#66bb6a',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    margin: 6,
+    alignItems: 'center',
+    minWidth: '40%',
+    flexGrow: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  choiceText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  errorText: {
+    color: 'red',
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  scrollViewStyle: {},
 }); 
