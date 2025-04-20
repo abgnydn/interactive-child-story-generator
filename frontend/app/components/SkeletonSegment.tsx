@@ -1,30 +1,52 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 
+interface SkeletonSegmentProps {
+  showImage?: boolean;
+  showText?: boolean;
+  showQuestion?: boolean;
+  numberOfChoices?: number;
+}
+
 // Simple static skeleton placeholder for a story segment
-export default function SkeletonSegmentComponent(): JSX.Element {
+export default function SkeletonSegmentComponent({
+  showImage = true,
+  showText = true,
+  showQuestion = true,
+  numberOfChoices = 2,
+}: SkeletonSegmentProps): JSX.Element {
   const placeholderColor = '#e0e0e0'; // Light gray for placeholders
 
   return (
     <View style={styles.segmentOuterContainer}>
       {/* Skeleton for Image */}
-      <View style={[styles.skeletonImage, { backgroundColor: placeholderColor }]} />
+      {showImage && (
+        <View style={[styles.skeletonImage, { backgroundColor: placeholderColor }]} />
+      )}
 
       {/* Skeleton for Text Bubble */}
-      <View style={styles.textContainer}>
-        <View style={[styles.skeletonTextBubble, { backgroundColor: placeholderColor }]} />
-      </View>
-
-      {/* Skeleton for Question Bubble */}
-      <View style={styles.questionChoicesContainer}>
-        <View style={[styles.skeletonQuestionBubble, { backgroundColor: placeholderColor }]} />
-        
-        {/* Skeleton for Choice Buttons */}
-        <View style={styles.choicesGridContainer}>
-          <View style={[styles.skeletonChoiceButton, { backgroundColor: placeholderColor }]} />
-          <View style={[styles.skeletonChoiceButton, { backgroundColor: placeholderColor }]} />
+      {showText && (
+        <View style={styles.textContainer}>
+          <View style={[styles.skeletonTextBubble, { backgroundColor: placeholderColor }]} />
         </View>
-      </View>
+      )}
+
+      {/* Skeleton for Question Bubble & Choices */}
+      {showQuestion && (
+        <View style={styles.questionChoicesContainer}>
+          <View style={[styles.skeletonQuestionBubble, { backgroundColor: placeholderColor }]} />
+          
+          {/* Skeleton for Choice Buttons */}
+          <View style={styles.choicesGridContainer}>
+            {Array.from({ length: numberOfChoices }).map((_, index) => (
+              <View
+                key={`skeleton-choice-${index}`}
+                style={[styles.skeletonChoiceButton, { backgroundColor: placeholderColor }]}
+              />
+            ))}
+          </View>
+        </View>
+      )}
     </View>
   );
 }

@@ -61,22 +61,25 @@ if (!redisUrl) {
 // This avoids needing `global.` everywhere but keeps the fallback logic
 const sessionStore = global.redisClient || global.storySessions; 
 const SESSION_TTL_SECONDS = 60 * 60 * 2; // 2 hours session expiry
+const TARGET_STEPS = 5; // Define the target number of interactive steps
 
 // --- Helper Functions ---
 
 // Function to generate story text using Together AI (Llama 3.3 JSON Mode)
-async function generateText(prompt, isFinalStep = false) {
+async function generateText(prompt, stepInfo = {}) { // Pass step info
+  const { currentStep = 1, targetSteps = TARGET_STEPS, isFinal = false } = stepInfo;
   try {
-    const promptType = isFinalStep ? 'Conclusion' : 'Continuation';
+    const promptType = isFinal ? 'Conclusion' : `Continuation (Step ${currentStep}/${targetSteps})`;
     console.log(`Generating text (${promptType}) via Together AI (Llama 3.3 JSON Mode) with prompt:`, prompt.substring(0, 150) + '...');
 
     let finalPrompt;
     const responseFormat = { type: "json_object" };
     let maxTokens = 250;
+    const isPenultimate = currentStep === targetSteps -1 && !isFinal; // Check if it's the step before the final one
 
-    if (isFinalStep) {
+    if (isFinal) {
         // Prompt for conclusion - ask for JSON with ONLY a "story" key
-        finalPrompt = `[INST] You are a creative children's story writer concluding a story based on the user's input. Write a short concluding paragraph (around 50-70 words).
+        finalPrompt = `[INST] You are a creative children's story writer concluding a short interactive story (currently at step ${currentStep} of ${targetSteps}). Write a short concluding paragraph (around 50-70 words) based on the user's final choice.
 
 User input/previous context:
 ${prompt}
@@ -90,10 +93,31 @@ Example JSON output:
 }
 
 Output ONLY the JSON object. [/INST]`;
-        maxTokens = 150; // Less needed for just text in one key
+        maxTokens = 150; 
+    } else if (isPenultimate) {
+        // Penultimate step: prompt to lead towards conclusion
+        finalPrompt = `[INST] You are a creative children's story writer writing a short interactive story (currently at step ${currentStep} of ${targetSteps}). Write a short story continuation (around 50-70 words) based on the user's input that leads towards a natural conclusion in the *next* step.
+
+User input/context:
+${prompt}
+
+Your response MUST be a valid JSON object containing ONLY the following keys: "story", "question", and "choices".
+"story": string (The story continuation text).
+"question": string (A short question setting up the final choice?).
+"choices": array of 3 strings (Three short action choices that will lead to a conclusion).
+
+Example JSON output:
+{
+  "story": "Lily saw the path fork. One way led to the dark woods, the other towards a sunny meadow.",
+  "question": "Which path should Lily take to finish her journey?",
+  "choices": ["Dark woods", "Sunny meadow", "Rest here"]
+}
+
+Output ONLY the JSON object. [/INST]`;
+        maxTokens = 250;
     } else {
-        // Prompt asking for JSON output (story, question, choices)
-        finalPrompt = `[INST] You are a creative children's story writer. Write a short story continuation (around 50-70 words) based on the user's input.
+        // Normal intermediate step
+        finalPrompt = `[INST] You are a creative children's story writer writing a short interactive story (currently at step ${currentStep} of ${targetSteps}). Write a short story continuation (around 50-70 words) based on the user's input.
 
 User input/context:
 ${prompt}
@@ -111,7 +135,7 @@ Example JSON output:
 }
 
 Output ONLY the JSON object. [/INST]`;
-         maxTokens = 250; // Keep original token count
+         maxTokens = 250; 
     }
 
     const completion = await together.chat.completions.create({
@@ -127,7 +151,7 @@ Output ONLY the JSON object. [/INST]`;
     if (completion.choices && completion.choices[0] && completion.choices[0].message && completion.choices[0].message.content) {
         const jsonString = completion.choices[0].message.content.trim();
 
-        if (isFinalStep) {
+        if (isFinal) {
             console.log('Together AI Text generation successful (Received JSON for Conclusion):', jsonString);
             try {
                 // Parse the JSON string for the conclusion
@@ -170,12 +194,12 @@ Output ONLY the JSON object. [/INST]`;
 
   } catch (error) {
     const errorDetails = error.response ? { status: error.response.status, data: error.response.data } : error.message;
-    console.error(`Error calling Together AI API (Text - Llama 3.3 ${isFinalStep ? 'Conclusion JSON' : 'JSON'}):`, errorDetails);
+    console.error(`Error calling Together AI API (Text - Llama 3.3 ${isFinal ? 'Conclusion JSON' : 'JSON'}):`, errorDetails);
      // Return fallback structure appropriate for the step
      return {
          story: "Oops! The connection fizzled.",
-         question: isFinalStep ? null : "Try again?",
-         choices: isFinalStep ? [] : ["Yes", "No", "Maybe"]
+         question: isFinal ? null : "Try again?",
+         choices: isFinal ? [] : ["Yes", "No", "Maybe"]
      };
 
   }
@@ -273,11 +297,11 @@ app.post('/start-story', async (req, res) => {
     console.log(`Session ${sessionId} created and stored in Redis.`);
 
     console.log('Generating first story segment (Step 1) using Together AI...');
-    const initialPrompt = `Start a children's story (around 50-70 words, simple language) with:\nStyle: ${style}\nCharacter: ${character}\nSetting: ${setting}\nTheme: ${effectiveTheme}`;
+    const initialPrompt = `Start a short interactive children's story (around ${TARGET_STEPS} steps) with the following elements: Style: ${style}, Character: ${character}, Setting: ${setting}, Theme: ${effectiveTheme}. Begin the story and ask the first question with 3 choices.`;
 
     console.log('Using prompt for Together AI text generation:', initialPrompt);
 
-    const storyData = await generateText(initialPrompt);
+    const storyData = await generateText(initialPrompt, { currentStep: 1, targetSteps: TARGET_STEPS, isFinal: false });
 
     // Check if storyData has fallback content due to error
     if (!storyData || storyData.story.includes("Oops")) { // Basic check for error markers
@@ -326,141 +350,101 @@ app.post('/start-story', async (req, res) => {
 // Endpoint to generate the next story segment
 app.post('/generate-next', async (req, res) => {
   try {
+    console.log('Received generate-next request:', req.body);
     const { sessionId, userChoice } = req.body;
-    console.log(`Received /generate-next request with sessionId: ${sessionId}, userChoice: ${userChoice}`);
 
     if (!sessionId || !userChoice) {
-        console.warn('/generate-next missing sessionId or userChoice');
+        console.warn('Missing sessionId or userChoice for generate-next');
         return res.status(400).json({ success: false, error: 'Missing sessionId or userChoice' });
     }
 
-    // Ensure Redis is connected (Keep this check)
+    // Ensure Redis is connected
     if (!global.redisClient || global.redisClient.status !== 'ready') {
         console.error('Redis connection is not ready');
         return res.status(500).json({ success: false, error: 'Redis connection is not ready' });
     }
 
-    // Get session data directly from Redis (No if(useRedis) check needed)
-    const sessionDataString = await global.redisClient.get(sessionId);
-    if (!sessionDataString) {
-        console.warn(`Session ${sessionId} not found in Redis.`);
-        return res.status(404).json({ success: false, error: 'Story session not found or has expired.' });
+    // --- Generate Next Logic --- 
+    // Retrieve session data from Redis
+    let sessionDataString;
+    try {
+      sessionDataString = await global.redisClient.get(sessionId);
+    } catch (redisError) {
+      console.error(`Error retrieving session ${sessionId} from Redis:`, redisError);
+      return res.status(500).json({ success: false, error: 'Failed to retrieve session data' });
     }
-    const sessionData = JSON.parse(sessionDataString);
-
-    console.log(`Continuing story for session ${sessionId}. Step: ${sessionData.stepCount}`);
-    const currentStoryText = sessionData.segments[sessionData.stepCount - 1].text;
-    const nextPrompt = `Continue this children's story based on the user choice.
-Story So Far:
-${currentStoryText}
-
-User chose: "${userChoice}".
-
-Write the next short part (around 50-70 words). Maintain style: ${sessionData.style}, character: ${sessionData.character}, setting: ${sessionData.setting}, theme: ${sessionData.theme}.`;
-
-    sessionData.stepCount += 1;
-    const isFinalStep = sessionData.stepCount >= 5;
-
-    const result = await generateStorySegment(sessionData, nextPrompt, isFinalStep);
-    if (result.error) {
-        throw new Error(result.error);
-    }
-
-    sessionData.segments.push({
-      text: result.story,
-      imageUrl: result.imageUrl
-    });
-    sessionData.lastUpdated = new Date().toISOString();
-
-    // Store updated session data directly in Redis (No if(useRedis) check needed)
-    await global.redisClient.set(sessionId, JSON.stringify(sessionData), 'EX', SESSION_TTL_SECONDS);
-    console.log(`Session ${sessionId} updated in Redis. Step: ${sessionData.stepCount}`);
     
-    res.json({
-      success: true,
-      story: result.story,
-      imageUrl: result.imageUrl,
-      question: result.question,
-      choices: result.choices
+    if (!sessionDataString) {
+      console.warn(`Session not found for ID: ${sessionId}`);
+      return res.status(404).json({ success: false, error: 'Session not found or expired' });
+    }
+
+    const sessionData = JSON.parse(sessionDataString);
+    let currentStepCount = sessionData.stepCount || 0;
+    currentStepCount++; // Increment step count for the *next* segment
+
+    // --- Prompt Construction --- 
+    // Combine initial prompts and history for context
+    let contextPrompt = `Initial story setup: Style: ${sessionData.style}, Character: ${sessionData.character}, Setting: ${sessionData.setting}, Theme: ${sessionData.theme || ''}.\n`;
+    // Add previous story parts (limit history length if needed)
+    sessionData.segments.forEach((segment, index) => {
+        contextPrompt += `Part ${index + 1}: ${segment.text}\n`;
     });
+    contextPrompt += `User just chose: "${userChoice}"`;
+
+    // Determine if this is the final step
+    const isFinalStep = currentStepCount === TARGET_STEPS;
+
+    // --- Generate Next Story Segment --- 
+    const storyData = await generateText(contextPrompt, { 
+        currentStep: currentStepCount, 
+        targetSteps: TARGET_STEPS, 
+        isFinal: isFinalStep 
+    });
+
+    // --- Generate Image --- 
+    const imageUrl = await generateImage(storyData.story, sessionData.visualStylePrompt); 
+
+    // --- Update Session Data --- 
+    sessionData.segments.push({ text: storyData.story, imageUrl }); // Add new segment to history
+    sessionData.stepCount = currentStepCount; // Update step count
+
+    try {
+      // Save updated session data back to Redis, refresh TTL
+      await global.redisClient.set(sessionId, JSON.stringify(sessionData), 'EX', SESSION_TTL_SECONDS);
+      console.log(`Session ${sessionId} updated in Redis (Step ${currentStepCount}).`);
+    } catch (redisError) {
+      console.error(`Error updating session ${sessionId} in Redis:`, redisError);
+      // Proceed with response even if Redis update fails, but log it
+    }
+
+    // --- Prepare Response --- 
+    const responsePayload = {
+        success: true,
+        story: storyData.story,
+        imageUrl
+    };
+
+    // Only include question/choices if it's NOT the final step
+    if (!isFinalStep && storyData.question && storyData.choices && storyData.choices.length > 0) {
+        responsePayload.question = storyData.question;
+        responsePayload.choices = storyData.choices;
+    } else if (!isFinalStep) {
+        // Handle case where intermediate step unexpectedly returns no question/choices
+        console.warn(`Step ${currentStepCount} should have question/choices but didn't receive valid ones from LLM. Ending story early.`);
+        // Don't add question/choices, the frontend will show completion card
+    } else {
+        console.log(`Final step (${currentStepCount}) reached. Sending conclusion only.`);
+        // Explicitly don't add question/choices for the final step
+    }
+
+    res.json(responsePayload);
 
   } catch (error) {
-    // Log error with session ID if possible
-    const sid = req.body?.sessionId || 'unknown';
-    console.error(`Error in /generate-next for session ${sid}:`, error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to generate next part of the story due to an internal server error.'
-    });
+    console.error('Error in /generate-next:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });
-
-
-// Helper function to generate subsequent story segments
-async function generateStorySegment(session, context, userChoice) {
-  try {
-    const currentStep = session.stepCount || 2; // Default to 2 if somehow missing
-    const isFinalStep = currentStep >= 5; // Treat step 5 (or higher just in case) as final
-
-    console.log(`Generating story ${isFinalStep ? 'conclusion' : 'continuation'} (Step ${currentStep}) using Together AI...`);
-    const { style, character, setting, theme, visualStylePrompt } = session;
-
-    // Prepare prompt (context might differ slightly for conclusion)
-    const continuationPrompt = isFinalStep ?
-        `Conclude this children's story based on the user's last choice.
-Story So Far:
-        ${context}
-        
-User chose: "${userChoice}".
-
-Write a short concluding paragraph (around 50-70 words). Maintain style: ${style}, character: ${character}, setting: ${setting}, theme: ${theme}.`
-      :
-        `Continue this children's story based on the user choice.
-Story So Far:
-${context}
-
-User chose: "${userChoice}".
-
-Write the next short part (around 50-70 words). Maintain style: ${style}, character: ${character}, setting: ${setting}, theme: ${theme}.`;
-
-    console.log('Using prompt for Together AI text generation:', continuationPrompt);
-
-    // Call generateText, passing isFinalStep
-    const storyData = await generateText(continuationPrompt, isFinalStep);
-
-    // ... (check for errors in storyData) ...
-     if (!storyData || (!storyData.story && !isFinalStep)) { // Check if story text is missing (except for final step maybe?)
-        console.warn('generateText returned invalid data within generateStorySegment');
-        return { 
-             story: "Error generating text.", 
-             question: isFinalStep ? null : "Try again?", 
-             choices: isFinalStep ? [] : ["Yes", "No", "Maybe"],
-             imageUrl: fallbackImageUrl
-           }; 
-    }
-
-    console.log(`Generating image for ${isFinalStep ? 'conclusion' : 'continuation'} using Together AI...`);
-    // Use the stored visual style
-    const imageUrl = await generateImage(storyData.story, session.visualStylePrompt);
-
-    // Return data (question/choices will be null/empty if final)
-    return {
-      story: storyData.story,
-      imageUrl: imageUrl,
-      question: storyData.question,
-      choices: storyData.choices
-    };
-
-  } catch (error) {
-    console.error('Error within generateStorySegment helper (TogetherAI):', error);
-    return { // Return fallback structure on unexpected error
-      story: "Oops! The story generation hit a snag.",
-      imageUrl: fallbackImageUrl,
-      question: "What should happen next?",
-      choices: ["Retry", "Explore", "Wait"]
-    };
-  }
-}
 
 // Declare fallbackImageUrl globally
 const fallbackImageUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
