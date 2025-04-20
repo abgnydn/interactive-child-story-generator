@@ -33,6 +33,7 @@ import {
 import StorySegmentComponent from '../components/StorySegment';
 import LoadingSpinner from '../components/LoadingSpinner';
 import SkeletonSegmentComponent from '../components/SkeletonSegment';
+import UserChoiceBubble from '../components/UserChoiceBubble';
 
 // Add 'visualStyle' to the possible steps
 type StoryStep = ExistingStoryStep | 'visualStyle';
@@ -75,7 +76,7 @@ export default function StoryBuilder(): JSX.Element {
 
   useEffect(() => {
     if (scrollViewRef.current && story?.segments && story.segments.length > 0) {
-      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 250);
     }
   }, [story?.segments]);
 
@@ -260,126 +261,65 @@ export default function StoryBuilder(): JSX.Element {
   };
 
   const handleChoice = async (choice: string): Promise<void> => {
-    if (!story) {
-      console.error('Cannot handle choice: story is null');
+    if (!story || !story.segments || story.segments.length === 0 || !sessionId) {
+      console.error('Cannot handle choice: prerequisite missing');
       return;
     }
 
-    if (!story.segments || story.segments.length === 0) {
-      console.error('Cannot handle choice: story has no segments');
-      return;
-    }
+    // --- Immediate UI Update --- 
+    const lastSegmentIndex = story.segments.length - 1;
+    const updatedSegments = [...story.segments];
+    // Add the choice text to the segment the user just read
+    updatedSegments[lastSegmentIndex] = { 
+      ...updatedSegments[lastSegmentIndex],
+      userChoiceText: choice 
+    };
 
-    if (!sessionId) {
-      console.error('Cannot handle choice: no session ID');
-      return;
-    }
-    
-    setIsLoading(true);
+    // Update story state immediately with the choice text added to the last segment
+    // Also clear current question/choices immediately
+    setStory(prev => prev ? { ...prev, segments: updatedSegments } : null);
+    setCurrentQuestion(''); 
+    setCurrentChoices([]);
+    // ------------------------
+
+    setIsLoading(true); 
     setIsRateLimited(false);
     
     try {
-      let response;
+      // --- API Call --- 
+      const response = await fetch(`${API_BASE_URL}/generate-next`, {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ sessionId, userChoice: choice }),
+      });
+
+      const data = await response.json();
+      if (!data.success) { throw new Error(data.error || 'Failed to generate segment'); }
+      // ----------------------------
+
+      // --- Update with New Segment --- 
+      const newSegment: StorySegment = {
+        text: data.story || "The story continues...",
+        imageUrl: data.imageUrl || undefined, 
+        // userChoiceText is NOT added here 
+      };
       
-      if (USE_MOCK_DATA) {
-        // Use mock data for development
-        const mockSegment: StorySegment = {
-          text: `After choosing to '${choice}', the character decided to ${choice.toLowerCase()}. This led to an exciting new adventure with unexpected twists and turns.`,
-          imageUrl: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=800",
-          userChoiceText: choice
-        };
-        
-        const updatedStory = {
-          ...story,
-          segments: [...story.segments, mockSegment],
-          lastUpdated: new Date().toISOString()
-        };
-        
-        console.log('Updated story with mock segment:', updatedStory);
-        setStory(updatedStory);
-        await saveStory(updatedStory);
-        
-        setCurrentQuestion("What should happen next?");
-        setCurrentChoices([
-          "Explore",
-          "Discover",
-          "Adventure",
-          "Help"
-        ]);
-        
-        // Initialize the view state for the new segment
-        setActiveViews(prev => ({
-          ...prev,
-          [updatedStory.segments.length - 1]: 'story'
-        }));
-      } else {
-        // Use the real API with session context
-        response = await fetch(`${API_BASE_URL}/generate-next`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            sessionId,
-            userChoice: choice
-          }),
-        });
+      // Append the NEW segment, set NEW question/choices
+      setStory(prev => prev ? { 
+        ...prev, 
+        segments: [...prev.segments, newSegment] 
+      } : null);
+      setCurrentQuestion(data.question || 'What should happen next?');
+      setCurrentChoices(data.choices || []);
+      // ----------------------------
 
-        if (!response.ok) {
-          if (response.status === 429) {
-            const data = await response.json();
-            handleRateLimitError(data.retryAfter || 30);
-            throw new Error('Rate limit exceeded. Please try again later.');
-          }
-          throw new Error('Failed to generate next segment');
-        }
-
-        const data = await response.json();
-        
-        if (!data.success) {
-          throw new Error(data.error || 'Failed to generate story segment');
-        }
-        
-        const newSegment: StorySegment = {
-          text: data.story || "The story continues with an exciting adventure.",
-          imageUrl: data.imageUrl || "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=800",
-          userChoiceText: choice
-        };
-        
-        const updatedStory = {
-          ...story,
-          segments: [...story.segments, newSegment],
-          lastUpdated: new Date().toISOString()
-        };
-        
-        console.log('Updated story with new segment:', updatedStory);
-        setStory(updatedStory);
-        await saveStory(updatedStory);
-        
-        if (data.question && data.choices) {
-          setCurrentQuestion(data.question);
-          setCurrentChoices(data.choices);
-          
-          // Initialize the view state for the new segment
-          setActiveViews(prev => ({
-            ...prev,
-            [updatedStory.segments.length - 1]: 'story'
-          }));
-        } else {
-          // Set default question and choices if not provided
-          setCurrentQuestion("What should happen next?");
-          setCurrentChoices(["Explore", "Discover", "Adventure"]);
-          
-          // Initialize the view state for the new segment
-          setActiveViews(prev => ({
-            ...prev,
-            [updatedStory.segments.length - 1]: 'story'
-          }));
-        }
-      }
     } catch (error) {
       console.error('Error generating next segment:', error);
       setError(error instanceof Error ? error.message : 'Failed to generate story segment');
+      // Restore question/choices if API failed?
+      // Maybe set currentQuestion = "Error fetching next part... Try again?" and provide limited choices?
+      // Or revert the userChoiceText addition?
+      // For now, just show alert.
       if (!isRateLimited) {
         Alert.alert(
           'Error',
@@ -546,15 +486,22 @@ export default function StoryBuilder(): JSX.Element {
                 </View>
               ) : (
                 story.segments?.map((segment, index) => (
-                  <StorySegmentComponent
-                    key={index} 
-                    segment={segment}
-                    index={index}
-                    question={index === story.segments.length - 1 ? currentQuestion : undefined}
-                    choices={index === story.segments.length - 1 ? currentChoices : undefined}
-                    onChoiceSelect={handleChoice} 
-                    speakText={speakText} 
-                  />
+                  <React.Fragment key={index}>
+                    <StorySegmentComponent
+                      segment={segment}
+                      index={index}
+                      question={index === story.segments.length - 1 ? currentQuestion : undefined}
+                      choices={index === story.segments.length - 1 ? currentChoices : undefined}
+                      onChoiceSelect={handleChoice} 
+                      speakText={speakText} 
+                    />
+                    {segment.userChoiceText && (
+                      <UserChoiceBubble 
+                        key={`choice-${index}`} 
+                        text={segment.userChoiceText} 
+                      />
+                    )}
+                  </React.Fragment>
                 ))
               )}
               
