@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -12,6 +12,7 @@ import {
   Animated,
   Alert,
   TextInput,
+  Platform,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Stack, router } from 'expo-router';
@@ -36,6 +37,9 @@ import LoadingSpinner from '../components/LoadingSpinner';
 type StoryStep = ExistingStoryStep | 'visualStyle';
 
 const { width } = Dimensions.get('window');
+
+// Define the backend API URL
+const API_BASE_URL = 'https://interactive-child-story-generator.onrender.com';
 
 export default function StoryBuilder(): JSX.Element {
   const [currentStep, setCurrentStep] = useState<StoryStep>('style');
@@ -151,7 +155,7 @@ export default function StoryBuilder(): JSX.Element {
       const visualStylePrompt = selectedChoices[4]?.prompt || 'simple cartoon style';
       
       // Start a new story session
-      const response = await fetch(`${API_URL}/start-story`, {
+      const response = await fetch(`${API_BASE_URL}/start-story`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -298,7 +302,7 @@ export default function StoryBuilder(): JSX.Element {
         }));
       } else {
         // Use the real API with session context
-        response = await fetch(`${API_URL}/generate-next`, {
+        response = await fetch(`${API_BASE_URL}/generate-next`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
