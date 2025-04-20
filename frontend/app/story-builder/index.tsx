@@ -448,8 +448,8 @@ export default function StoryBuilder(): JSX.Element {
     }));
   };
 
-  const renderStepTitle = () => {
-    switch (currentStep) {
+  const renderStepTitle = (step: string) => {
+    switch (step) {
       case 'style':
         return 'What kind of story do you want?';
       case 'character':
@@ -493,7 +493,7 @@ export default function StoryBuilder(): JSX.Element {
     <SafeAreaView style={styles.container}>
       <Stack.Screen
         options={{
-          title: renderStepTitle(),
+          title: renderStepTitle(currentStep),
           headerStyle: {
             backgroundColor: 'white',
           },
@@ -507,22 +507,22 @@ export default function StoryBuilder(): JSX.Element {
       <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
         {['style', 'character', 'setting', 'theme', 'visualStyle'].includes(currentStep) ? (
           <View style={styles.content}>
-            <ScrollView style={styles.scrollView}>
+            <Text style={styles.stepTitle}>{renderStepTitle(currentStep)}</Text>
+            <ScrollView contentContainerStyle={styles.choicesGrid}>
               {getCurrentChoices().map((choice) => (
                 <View key={choice.id} style={styles.card}>
                   <View style={[styles.cardImage, { backgroundColor: choice.color + '20' }]}>
-                    <MaterialIcons name={choice.icon} size={64} color={choice.color} /> 
+                    <MaterialIcons name={choice.icon} size={56} color={choice.color} /> 
                     <Text style={[styles.imageTitle, { color: choice.color }]}>{choice.name}</Text>
                   </View>
                   <View style={styles.cardContent}>
-                    <Text style={styles.cardTitle}>{choice.name}</Text>
                     <Text style={styles.cardDescription}>{choice.description}</Text>
                     <TouchableOpacity
                       style={[styles.button, { backgroundColor: choice.color }]}
                       onPress={() => handleStyleChoice(choice)}
                     >
-                      <MaterialIcons name="play-arrow" size={24} color="white" />
-                      <Text style={styles.buttonText}>Choose {choice.name}</Text>
+                      <MaterialIcons name="check-circle-outline" size={20} color="white" />
+                      <Text style={styles.buttonText}>Select</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -532,16 +532,17 @@ export default function StoryBuilder(): JSX.Element {
         ) : currentStep === 'story' && story ? (
           <View style={styles.storyContainer}>
             {story.segments && story.segments.length > 0 ? (
-              <StorySegmentComponent
-                segment={story.segments[story.segments.length - 1]}
-                index={story.segments.length - 1}
-                isQuestionView={activeViews[story.segments.length - 1] === 'question'}
-                question={currentQuestion}
-                choices={currentChoices}
-                onToggleView={() => toggleSegmentView(story.segments.length - 1)}
-                onChoiceSelect={(choice: string) => handleChoice(choice)}
-                speakText={speakText}
-              />
+              story.segments.map((segment, index) => (
+                <StorySegmentComponent
+                  key={index} 
+                  segment={segment}
+                  index={index}
+                  question={index === story.segments.length - 1 ? currentQuestion : undefined}
+                  choices={index === story.segments.length - 1 ? currentChoices : undefined}
+                  onChoiceSelect={handleChoice} 
+                  speakText={speakText} 
+                />
+              ))
             ) : (
               <View style={styles.loadingContainer}>
                 <LoadingSpinner message="Generating your story..." />
@@ -655,30 +656,35 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    justifyContent: 'center',
-    gap: 24,
+    width: '100%',
+  },
+  choicesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-around',
+    paddingHorizontal: 10,
+    paddingBottom: 20,
   },
   card: {
+    width: '46%',
     backgroundColor: 'white',
-    borderRadius: 20,
+    borderRadius: 15,
+    marginBottom: 15,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 5,
+    elevation: 3,
   },
   cardImage: {
-    width: '100%',
-    height: 200,
-    justifyContent: 'center',
+    paddingVertical: 20,
     alignItems: 'center',
+    borderTopLeftRadius: 15,
+    borderTopRightRadius: 15,
   },
   imageTitle: {
-    fontSize: 24,
+    fontSize: 16,
     fontWeight: 'bold',
     marginTop: 16,
     textAlign: 'center',
@@ -707,7 +713,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: 'white',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     marginLeft: 8,
   },
@@ -793,6 +799,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 30,
   },
   loadingText: {
     fontSize: 18,
@@ -822,6 +829,36 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: 'white',
     fontSize: 16,
+    fontWeight: 'bold',
+  },
+  stepTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'center',
+    marginVertical: 20, 
+  },
+  storyContainer: {
+    flex: 1,
+    padding: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 30,
+  },
+  rateLimitBanner: {
+    backgroundColor: '#FFF3E0',
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#FFE0B2',
+  },
+  rateLimitText: {
+    color: '#E65100',
+    fontSize: 14,
     fontWeight: 'bold',
   },
 }); 
