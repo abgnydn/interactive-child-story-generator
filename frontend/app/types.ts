@@ -3,6 +3,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 export interface StorySegment {
   text: string;
   imageUrl?: string;
+  userChoiceText?: string;
 }
 
 export interface Story {

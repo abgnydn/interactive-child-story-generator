@@ -63,11 +63,18 @@ export default function StoryBuilder(): JSX.Element {
   const [stylePrompt, setStylePrompt] = useState<string>('');
   const [isRateLimited, setIsRateLimited] = useState(false);
   const [retryCountdown, setRetryCountdown] = useState<number>(0);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     lockOrientation();
     fadeIn();
   }, []);
+
+  useEffect(() => {
+    if (scrollViewRef.current && story?.segments && story.segments.length > 0) {
+      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+    }
+  }, [story?.segments]);
 
   const lockOrientation = async () => {
     try {
@@ -274,8 +281,9 @@ export default function StoryBuilder(): JSX.Element {
       if (USE_MOCK_DATA) {
         // Use mock data for development
         const mockSegment: StorySegment = {
-          text: `After considering the options, the character decided to ${choice.toLowerCase()}. This led to an exciting new adventure with unexpected twists and turns.`,
-          imageUrl: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=800"
+          text: `After choosing to '${choice}', the character decided to ${choice.toLowerCase()}. This led to an exciting new adventure with unexpected twists and turns.`,
+          imageUrl: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=800",
+          userChoiceText: choice
         };
         
         const updatedStory = {
@@ -331,7 +339,8 @@ export default function StoryBuilder(): JSX.Element {
         
         const newSegment: StorySegment = {
           text: data.story || "The story continues with an exciting adventure.",
-          imageUrl: data.imageUrl || "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=800"
+          imageUrl: data.imageUrl || "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=800",
+          userChoiceText: choice
         };
         
         const updatedStory = {
@@ -530,24 +539,26 @@ export default function StoryBuilder(): JSX.Element {
             </ScrollView>
           </View>
         ) : currentStep === 'story' && story ? (
-          <View style={styles.storyContainer}>
-            {story.segments && story.segments.length > 0 ? (
-              story.segments.map((segment, index) => (
-                <StorySegmentComponent
-                  key={index} 
-                  segment={segment}
-                  index={index}
-                  question={index === story.segments.length - 1 ? currentQuestion : undefined}
-                  choices={index === story.segments.length - 1 ? currentChoices : undefined}
-                  onChoiceSelect={handleChoice} 
-                  speakText={speakText} 
-                />
-              ))
-            ) : (
-              <View style={styles.loadingContainer}>
-                <LoadingSpinner message="Generating your story..." />
-              </View>
-            )}
+          <View style={styles.storyRenderContainer}>
+            <ScrollView ref={scrollViewRef} contentContainerStyle={styles.storyScrollContent}>
+              {story.segments && story.segments.length > 0 ? (
+                story.segments.map((segment, index) => (
+                  <StorySegmentComponent
+                    key={index} 
+                    segment={segment}
+                    index={index}
+                    question={index === story.segments.length - 1 ? currentQuestion : undefined}
+                    choices={index === story.segments.length - 1 ? currentChoices : undefined}
+                    onChoiceSelect={handleChoice} 
+                    speakText={speakText} 
+                  />
+                ))
+              ) : (
+                <View style={styles.loadingContainer}>
+                  <LoadingSpinner message="Generating your story..." />
+                </View>
+              )}
+            </ScrollView>
             
             <View style={styles.buttonContainer}>
               <TouchableOpacity
@@ -732,15 +743,21 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
-  storyContainer: {
+  storyRenderContainer: {
     flex: 1,
+  },
+  storyScrollContent: {
     padding: 16,
+    paddingBottom: 80,
   },
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginTop: 20,
-    marginBottom: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    backgroundColor: '#F5F5F5',
   },
   finishButton: {
     flexDirection: 'row',
@@ -837,28 +854,5 @@ const styles = StyleSheet.create({
     color: '#333',
     textAlign: 'center',
     marginVertical: 20, 
-  },
-  storyContainer: {
-    flex: 1,
-    padding: 16,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 30,
-  },
-  rateLimitBanner: {
-    backgroundColor: '#FFF3E0',
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#FFE0B2',
-  },
-  rateLimitText: {
-    color: '#E65100',
-    fontSize: 14,
-    fontWeight: 'bold',
   },
 }); 

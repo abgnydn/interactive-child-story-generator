@@ -109,6 +109,15 @@ export default function StorySegmentComponent({
         )}
         
         <View style={styles.textContainer}>
+            {/* Display User's Previous Choice */}
+            {segment.userChoiceText && (
+              <View style={styles.userChoiceContainer}>
+                <Text style={styles.userChoiceText}>
+                  You chose: <Text style={{fontWeight: 'bold'}}>{segment.userChoiceText}</Text>
+                </Text>
+              </View>
+            )}
+
             <View style={styles.textAndSpeakerContainer}>
               <View style={styles.textBubble}>
                 <ScrollView style={styles.scrollViewStyle}>
@@ -184,6 +193,20 @@ const styles = StyleSheet.create({
   textContainer: {
     paddingHorizontal: 5,
     alignItems: 'center',
+  },
+  userChoiceContainer: {
+    backgroundColor: '#eeeeee',
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    marginBottom: 10,
+    alignSelf: 'flex-start',
+    marginLeft: 5,
+  },
+  userChoiceText: {
+    fontSize: 13,
+    color: '#555555',
+    fontStyle: 'italic',
   },
   textAndSpeakerContainer: {
     flexDirection: 'row',
