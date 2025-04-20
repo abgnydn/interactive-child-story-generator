@@ -14,11 +14,14 @@ import { Stack, router } from 'expo-router';
 import { Story } from '../types';
 import { getStories, deleteStory } from '../utils/storage';
 import LoadingSpinner from '../components/LoadingSpinner';
+import ConfirmModal from '../components/ConfirmModal';
 
 export default function MyStories(): JSX.Element {
   const [stories, setStories] = useState<Story[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isConfirmModalVisible, setIsConfirmModalVisible] = useState(false);
+  const [storyToDelete, setStoryToDelete] = useState<string | null>(null);
 
   const loadSavedStories = async () => {
     try {
@@ -48,27 +51,25 @@ export default function MyStories(): JSX.Element {
     loadSavedStories();
   };
 
-  const handleDelete = async (storyId: string) => {
-    Alert.alert(
-      'Delete Story',
-      'Are you sure you want to delete this story?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteStory(storyId);
-              setStories(stories.filter(story => story.id !== storyId));
-            } catch (error) {
-              console.error('Error deleting story:', error);
-              Alert.alert('Error', 'Failed to delete story');
-            }
-          },
-        },
-      ]
-    );
+  const promptDelete = (storyId: string) => {
+    setStoryToDelete(storyId);
+    setIsConfirmModalVisible(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!storyToDelete) {
+      return;
+    }
+    try {
+      await deleteStory(storyToDelete);
+      setStories(prevStories => prevStories.filter(story => story.id !== storyToDelete));
+    } catch (error) {
+      console.error('Error deleting story:', error);
+      Alert.alert('Error', 'Failed to delete story');
+    } finally {
+      setIsConfirmModalVisible(false);
+      setStoryToDelete(null);
+    }
   };
 
   const renderStoryItem = ({ item }: { item: Story }) => {
@@ -130,7 +131,7 @@ export default function MyStories(): JSX.Element {
         </View>
         
         <TouchableOpacity
-          onPress={() => handleDelete(item.id)}
+          onPress={() => promptDelete(item.id)}
           style={styles.deleteButton}
         >
           <MaterialIcons name="delete" size={24} color="#FF5252" />
@@ -156,6 +157,14 @@ export default function MyStories(): JSX.Element {
             fontWeight: 'bold',
             fontSize: 24,
           },
+          headerLeft: () => (
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={{ marginLeft: 15 }}
+            >
+              <MaterialIcons name="arrow-back" size={24} color="#333" />
+            </TouchableOpacity>
+          ),
         }}
       />
 
@@ -185,6 +194,19 @@ export default function MyStories(): JSX.Element {
           }
         />
       )}
+
+      <ConfirmModal
+        visible={isConfirmModalVisible}
+        title="Delete Story"
+        message="Are you sure you want to delete this story? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={confirmDelete}
+        onCancel={() => {
+          setIsConfirmModalVisible(false);
+          setStoryToDelete(null);
+        }}
+      />
     </View>
   );
 }

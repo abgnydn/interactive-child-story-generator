@@ -375,7 +375,7 @@ Write the next short part (around 50-70 words). Maintain style: ${sessionData.st
     // Store updated session data directly in Redis (No if(useRedis) check needed)
     await global.redisClient.set(sessionId, JSON.stringify(sessionData), 'EX', SESSION_TTL_SECONDS);
     console.log(`Session ${sessionId} updated in Redis. Step: ${sessionData.stepCount}`);
-
+    
     res.json({
       success: true,
       story: result.story,

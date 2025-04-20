@@ -34,6 +34,7 @@ import StorySegmentComponent from '../components/StorySegment';
 import LoadingSpinner from '../components/LoadingSpinner';
 import SkeletonSegmentComponent from '../components/SkeletonSegment';
 import UserChoiceBubble from '../components/UserChoiceBubble';
+import ConfirmModal from '../components/ConfirmModal';
 
 // Add 'visualStyle' to the possible steps
 type StoryStep = ExistingStoryStep | 'visualStyle';
@@ -45,6 +46,7 @@ const API_BASE_URL = __DEV__
   ? 'http://localhost:3000' // Use local backend in development
   : 'https://interactive-child-story-generator.onrender.com'; // Use deployed backend in production
 
+const TOTAL_CHOICE_STEPS = 5; // style, character, setting, theme, visualStyle
 
 export default function StoryBuilder(): JSX.Element {
   const [currentStep, setCurrentStep] = useState<StoryStep>('style');
@@ -68,6 +70,7 @@ export default function StoryBuilder(): JSX.Element {
   const [isRateLimited, setIsRateLimited] = useState(false);
   const [retryCountdown, setRetryCountdown] = useState<number>(0);
   const scrollViewRef = useRef<ScrollView>(null);
+  const [isConfirmModalVisible, setIsConfirmModalVisible] = useState(false);
 
   useEffect(() => {
     lockOrientation();
@@ -332,55 +335,50 @@ export default function StoryBuilder(): JSX.Element {
     }
   };
 
-  const handleFinishEarly = async () => {
+  // Function to handle finishing the story after confirmation
+  const finishStoryAndNavigate = async () => {
     if (!story) return;
-    
-    Alert.alert(
-      'Finish Story',
-      'Are you sure you want to finish the story early?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Finish',
-          onPress: async () => {
-            try {
-              // Add a conclusion segment
-              const conclusionSegment: StorySegment = {
-                text: "And so, the adventure came to an end. The character had learned valuable lessons about friendship, courage, and kindness. It was a journey that would be remembered forever.",
-                imageUrl: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=800"
-              };
-              
-              // Ensure story has an ID
-              const storyWithId = story.id ? story : {
-                ...story,
-                id: Date.now().toString(),
-                title: storyTitle || 'My Adventure Story'
-              };
-              
-              // Ensure segments array exists
-              if (!storyWithId.segments) {
-                storyWithId.segments = [];
-              }
-              
-              const updatedStory = {
-                ...storyWithId,
-                segments: [...storyWithId.segments, conclusionSegment],
-                lastUpdated: new Date().toISOString()
-              };
-              
-              console.log('Finishing story with conclusion:', updatedStory);
-              await saveStory(updatedStory);
-              
-              // Navigate to the story viewer
-              router.push(`/story-viewer/${updatedStory.id}`);
-            } catch (error) {
-              console.error('Error finishing story:', error);
-              Alert.alert('Error', 'Failed to finish story. Please try again.');
-            }
-          },
-        },
-      ]
-    );
+    try {
+      // Add a conclusion segment
+      const conclusionSegment: StorySegment = {
+        text: "And so, the adventure came to an end. The character learned valuable lessons and created lasting memories. The end.",
+        imageUrl: story.segments[story.segments.length - 1]?.imageUrl || "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=800" // Use last image or default
+      };
+      
+      // Ensure story has an ID and title
+      const storyWithId = story.id ? story : { 
+        ...story, 
+        id: Date.now().toString(),
+        title: storyTitle || 'My Adventure Story' 
+      };
+      
+      // Ensure segments array exists
+      if (!storyWithId.segments) {
+        storyWithId.segments = [];
+      }
+      
+      const updatedStory = {
+        ...storyWithId,
+        segments: [...storyWithId.segments, conclusionSegment],
+        lastUpdated: new Date().toISOString()
+      };
+      
+      console.log('Finishing story early via back button:', updatedStory);
+      await saveStory(updatedStory);
+      
+      // Navigate to the story viewer for the finished story
+      router.replace(`/story-viewer/${updatedStory.id}`); // Use replace to prevent going back to builder
+    } catch (error) {
+      console.error('Error finishing story:', error);
+      Alert.alert('Error', 'Failed to finish story. Please try again.');
+    } finally {
+      setIsConfirmModalVisible(false);
+    }
+  };
+
+  // Function to prompt the user before finishing
+  const promptFinishStory = () => {
+    setIsConfirmModalVisible(true);
   };
 
   const handleCreateNew = () => {
@@ -400,18 +398,19 @@ export default function StoryBuilder(): JSX.Element {
     }));
   };
 
-  const renderStepTitle = (step: string) => {
+  const renderStepTitle = (step: StoryStep, choicesCount: number) => {
+    const stepNumber = choicesCount + 1;
     switch (step) {
       case 'style':
-        return 'What kind of story do you want?';
+        return `Step ${stepNumber} of ${TOTAL_CHOICE_STEPS}: Story Type`;
       case 'character':
-        return 'Who is the main character?';
+        return `Step ${stepNumber} of ${TOTAL_CHOICE_STEPS}: Main Character`;
       case 'setting':
-        return 'Where does the story take place?';
+        return `Step ${stepNumber} of ${TOTAL_CHOICE_STEPS}: Setting`;
       case 'theme':
-        return 'What is the theme of the story?';
+        return `Step ${stepNumber} of ${TOTAL_CHOICE_STEPS}: Theme`;
       case 'visualStyle':
-        return 'Choose a Visual Style';
+        return `Step ${stepNumber} of ${TOTAL_CHOICE_STEPS}: Visual Style`;
       case 'story':
         return story?.title || 'Your Story';
       case 'complete':
@@ -436,26 +435,61 @@ export default function StoryBuilder(): JSX.Element {
       console.log('Speech Synthesis is only implemented for web.');
     }
   };
-
+ 
   return (
     <SafeAreaView style={styles.container}>
       <Stack.Screen
         options={{
-          title: renderStepTitle(currentStep),
+          title: renderStepTitle(currentStep, selectedChoices.length), // Pass selectedChoices.length
           headerStyle: {
             backgroundColor: 'white',
           },
           headerTintColor: '#333',
           headerTitleStyle: {
             fontWeight: 'bold',
+            fontSize: 16, // Adjust font size if needed
           },
+          headerBackVisible: false, // Explicitly hide default back button
+          // Add a back button that triggers handleCreateNew for confirmation?
+          // Or just rely on the system back button? For now, rely on system back.
+          headerLeft: () => (
+             ['story'].includes(currentStep) ? (
+              // When in story mode, back button prompts to finish
+              <TouchableOpacity onPress={promptFinishStory} style={{ marginLeft: 10 }}>
+                <MaterialIcons name="arrow-back" size={24} color="#333" />
+              </TouchableOpacity>
+            ) : ['character', 'setting', 'theme', 'visualStyle'].includes(currentStep) ? (
+               <TouchableOpacity onPress={() => {
+                 // Go back one step logic
+                 const previousStepMap: Record<StoryStep, StoryStep> = {
+                   character: 'style',
+                   setting: 'character',
+                   theme: 'setting',
+                   visualStyle: 'theme',
+                   style: 'style', // Cannot go back from style
+                   story: 'visualStyle', // Should not happen via this button
+                   complete: 'story', // Should not happen via this button
+                 };
+                 setSelectedChoices(prev => prev.slice(0, -1));
+                 setCurrentStep(previousStepMap[currentStep]);
+               }} style={{ marginLeft: 10 }}>
+                <MaterialIcons name="arrow-back" size={24} color="#333" />
+              </TouchableOpacity>
+            ) : null // No back button on the first step ('style')
+          ),
         }}
       />
 
       <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
         {['style', 'character', 'setting', 'theme', 'visualStyle'].includes(currentStep) ? (
           <View style={styles.content}>
-            <Text style={styles.stepTitle}>{renderStepTitle(currentStep)}</Text>
+             <Text style={styles.stepQuestionTitle}>{
+              currentStep === 'style' ? 'What kind of story do you want?' :
+              currentStep === 'character' ? 'Who is the main character?' :
+              currentStep === 'setting' ? 'Where does the story take place?' :
+              currentStep === 'theme' ? 'What is the theme of the story?' :
+              currentStep === 'visualStyle' ? 'Choose a Visual Style' : ''
+            }</Text>
             <ScrollView contentContainerStyle={styles.choicesGrid}>
               {getCurrentChoices().map((choice) => (
                 <View key={choice.id} style={styles.card}>
@@ -478,7 +512,7 @@ export default function StoryBuilder(): JSX.Element {
             </ScrollView>
           </View>
         ) : currentStep === 'story' && story ? (
-          <View style={styles.storyRenderContainer}>
+           <View style={styles.storyRenderContainer}>
             <ScrollView ref={scrollViewRef} contentContainerStyle={styles.storyScrollContent}>
               {isLoading && (!story.segments || story.segments.length === 0) ? (
                 <View style={styles.loadingContainer}>
@@ -510,23 +544,7 @@ export default function StoryBuilder(): JSX.Element {
               )}
             </ScrollView>
             
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity
-                style={styles.finishButton}
-                onPress={handleFinishEarly}
-              >
-                <MaterialIcons name="check-circle" size={24} color="white" />
-                <Text style={styles.buttonText}>Finish Story</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={styles.newStoryButton}
-                onPress={handleCreateNew}
-              >
-                <MaterialIcons name="add-circle" size={24} color="white" />
-                <Text style={styles.buttonText}>New Story</Text>
-              </TouchableOpacity>
-            </View>
+            {/* Button container removed */}
           </View>
         ) : currentStep === 'complete' ? (
           <View style={styles.completeContainer}>
@@ -575,7 +593,9 @@ export default function StoryBuilder(): JSX.Element {
               if (story.segments.length === 0) {
                 startStory();
               } else {
-                handleChoice(story.segments[story.segments.length - 1].text);
+                // Need the last choice to retry handleChoice correctly.
+                // This retry logic might need refinement. For now, just try starting again.
+                startStory(); 
               }
             }}
           >
@@ -583,6 +603,16 @@ export default function StoryBuilder(): JSX.Element {
           </TouchableOpacity>
         </View>
       )}
+
+      <ConfirmModal
+        visible={isConfirmModalVisible}
+        title="Finish Story?"
+        message="Are you sure you want to finish the story now? This will add a final conclusion."
+        confirmText="Finish Story"
+        cancelText="Keep Going"
+        onConfirm={finishStoryAndNavigate}
+        onCancel={() => setIsConfirmModalVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -591,26 +621,35 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
-    padding: 16,
+    paddingTop: 0, // Use SafeAreaView padding
+    paddingHorizontal: 16,
+    paddingBottom: 16,
   },
-  header: {
+  header: { // This style seems unused, maybe remove later?
     alignItems: 'center',
     marginTop: 40,
     marginBottom: 32,
   },
-  title: {
+  title: { // This style seems unused, maybe remove later?
     fontSize: 32,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 8,
   },
-  subtitle: {
+  subtitle: { // This style seems unused, maybe remove later?
     fontSize: 18,
     color: '#666',
   },
   content: {
     flex: 1,
     width: '100%',
+  },
+  stepQuestionTitle: { // Renamed from stepTitle
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'center',
+    marginVertical: 20, 
   },
   choicesGrid: {
     flexDirection: 'row',
@@ -644,25 +683,27 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   cardContent: {
-    padding: 20,
+    padding: 15, // Reduced padding slightly
   },
-  cardTitle: {
+  cardTitle: { // This style seems unused, maybe remove later?
     fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 8,
   },
   cardDescription: {
-    fontSize: 16,
+    fontSize: 14, // Reduced font size slightly
     color: '#666',
-    lineHeight: 24,
-    marginBottom: 16,
+    lineHeight: 20, // Adjusted line height
+    marginBottom: 12, // Reduced margin
+    minHeight: 60, // Ensure minimum height for description text
   },
   button: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
+    paddingVertical: 12, // Adjusted padding
+    paddingHorizontal: 16,
     borderRadius: 12,
   },
   buttonText: {
@@ -671,18 +712,18 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 8,
   },
-  titleContainer: {
+  titleContainer: { // This style seems unused, maybe remove later?
     padding: 16,
     backgroundColor: 'white',
     marginBottom: 16,
   },
-  titleLabel: {
+  titleLabel: { // This style seems unused, maybe remove later?
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 8,
     color: '#333',
   },
-  scrollView: {
+  scrollView: { // This style seems unused, maybe remove later?
     flex: 1,
     padding: 16,
   },
@@ -690,36 +731,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   storyScrollContent: {
-    padding: 16,
-    paddingBottom: 80,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 10,
     paddingHorizontal: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    backgroundColor: '#F5F5F5',
+    paddingTop: 16,
+    paddingBottom: 30, // Adjusted padding since buttons are removed
   },
-  finishButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#4CAF50',
-    borderRadius: 12,
-    padding: 12,
-    width: '45%',
-    justifyContent: 'center',
-  },
-  newStoryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#2196F3',
-    borderRadius: 12,
-    padding: 12,
-    width: '45%',
-    justifyContent: 'center',
-  },
+  // buttonContainer style is removed as the container is deleted
+  // finishButton style is removed
+  // newStoryButton style is removed
   completeContainer: {
     flex: 1,
     padding: 16,
@@ -761,7 +779,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 30,
   },
-  loadingText: {
+  loadingText: { // This style seems unused, maybe remove later?
     fontSize: 18,
     fontWeight: 'bold',
     color: '#4CAF50',
@@ -791,11 +809,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  stepTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#333',
-    textAlign: 'center',
-    marginVertical: 20, 
-  },
+  // stepTitle style is removed (renamed to stepQuestionTitle)
 }); 
