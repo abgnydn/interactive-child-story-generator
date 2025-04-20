@@ -148,21 +148,21 @@ export default function MyStories(): JSX.Element {
     <View style={styles.container}>
       <Stack.Screen
         options={{
-          title: 'My Magical Stories',
+          title: 'My Stories',
           headerStyle: {
             backgroundColor: '#FFE5B4',
           },
-          headerTintColor: '#333',
+          headerTintColor: '#6A0DAD',
           headerTitleStyle: {
             fontWeight: 'bold',
-            fontSize: 24,
+            fontSize: 20,
           },
           headerLeft: () => (
             <TouchableOpacity
               onPress={() => router.back()}
               style={{ marginLeft: 15 }}
             >
-              <MaterialIcons name="arrow-back" size={24} color="#333" />
+              <MaterialIcons name="arrow-back" size={24} color="#6A0DAD" />
             </TouchableOpacity>
           ),
         }}
@@ -171,12 +171,12 @@ export default function MyStories(): JSX.Element {
       {stories.length === 0 ? (
         <View style={styles.emptyContainer}>
           <MaterialIcons name="auto-stories" size={64} color="#FFB74D" />
-          <Text style={styles.emptyText}>No magical stories yet</Text>
+          <Text style={styles.emptyText}>No stories yet!</Text>
           <TouchableOpacity
             style={styles.createButton}
             onPress={() => router.push('/story-builder')}
           >
-            <Text style={styles.createButtonText}>Create New Story ✨</Text>
+            <Text style={styles.createButtonText}>Make a New Story! ✨</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -197,10 +197,10 @@ export default function MyStories(): JSX.Element {
 
       <ConfirmModal
         visible={isConfirmModalVisible}
-        title="Delete Story"
-        message="Are you sure you want to delete this story? This action cannot be undone."
-        confirmText="Delete"
-        cancelText="Cancel"
+        title="Delete Story?"
+        message="Are you sure you want to delete this story forever?"
+        confirmText="Yes, Delete"
+        cancelText="No, Keep It"
         onConfirm={confirmDelete}
         onCancel={() => {
           setIsConfirmModalVisible(false);

@@ -10,25 +10,25 @@ export default function Home() {
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <Text style={styles.title}>Child Story Generator</Text>
-          <Text style={styles.subtitle}>Create magical stories with AI</Text>
+          <Text style={styles.title}>Story Maker</Text>
+          <Text style={styles.subtitle}>Make Your Own Stories!</Text>
         </View>
 
         <View style={styles.content}>
           <View style={styles.card}>
             <View style={[styles.cardImage, { backgroundColor: '#E8F5E9' }]}>
               <MaterialIcons name="auto-stories" size={64} color="#4CAF50" />
-              <Text style={[styles.imageTitle, { color: '#4CAF50' }]}>Create New Story</Text>
+              <Text style={[styles.imageTitle, { color: '#4CAF50' }]}>Make a New Story</Text>
             </View>
             <View style={styles.cardContent}>
-              <Text style={styles.cardTitle}>Create New Story</Text>
+              <Text style={styles.cardTitle}>Make a New Story</Text>
               <Text style={styles.cardDescription}>
-                Start a new adventure with your child. Choose a style and let the magic begin!
+                Let's make a fun new story! Pick how it starts.
               </Text>
               <Link href="/story-builder" asChild>
                 <TouchableOpacity style={styles.button}>
                   <MaterialIcons name="add-circle" size={24} color="white" />
-                  <Text style={styles.buttonText}>Start New Story</Text>
+                  <Text style={styles.buttonText}>Make New Story</Text>
                 </TouchableOpacity>
               </Link>
             </View>
@@ -37,17 +37,17 @@ export default function Home() {
           <View style={styles.card}>
             <View style={[styles.cardImage, { backgroundColor: '#FFF3E0' }]}>
               <MaterialIcons name="book" size={64} color="#FF9800" />
-              <Text style={[styles.imageTitle, { color: '#FF9800' }]}>My Stories</Text>
+              <Text style={[styles.imageTitle, { color: '#FF9800' }]}>Saved Stories</Text>
             </View>
             <View style={styles.cardContent}>
-              <Text style={styles.cardTitle}>My Stories</Text>
+              <Text style={styles.cardTitle}>Saved Stories</Text>
               <Text style={styles.cardDescription}>
-                Continue your saved stories or read them again with your child.
+                Read the stories you saved.
               </Text>
               <Link href="/my-stories" asChild>
                 <TouchableOpacity style={styles.myStoriesButton}>
                   <MaterialIcons name="book" size={24} color="white" />
-                  <Text style={styles.buttonText}>View My Stories</Text>
+                  <Text style={styles.buttonText}>See Saved Stories</Text>
                 </TouchableOpacity>
               </Link>
             </View>

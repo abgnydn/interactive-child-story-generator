@@ -66,20 +66,24 @@ const TARGET_STEPS = 5; // Define the target number of interactive steps
 // --- Helper Functions ---
 
 // Function to generate story text using Together AI (Llama 3.3 JSON Mode)
-async function generateText(prompt, stepInfo = {}) { // Pass step info
+async function generateText(prompt, stepInfo = {}) { 
   const { currentStep = 1, targetSteps = TARGET_STEPS, isFinal = false } = stepInfo;
+  const ageTarget = "4-6 year old"; // Define target age group
+  const wordCountTarget = "40-60 words"; // Define target word count
   try {
     const promptType = isFinal ? 'Conclusion' : `Continuation (Step ${currentStep}/${targetSteps})`;
-    console.log(`Generating text (${promptType}) via Together AI (Llama 3.3 JSON Mode) with prompt:`, prompt.substring(0, 150) + '...');
+    console.log(`Generating text (${promptType}) for age ${ageTarget} via Together AI (Llama 3.3 JSON Mode) with prompt:`, prompt.substring(0, 150) + '...');
 
     let finalPrompt;
     const responseFormat = { type: "json_object" };
-    let maxTokens = 250;
-    const isPenultimate = currentStep === targetSteps -1 && !isFinal; // Check if it's the step before the final one
+    let maxTokens = 200; // Reduced max tokens slightly for shorter segments
+    const isPenultimate = currentStep === targetSteps -1 && !isFinal; 
+
+    const baseInstruction = `You are a friendly storyteller for children. Write in simple words and short sentences suitable for a ${ageTarget} child. Keep the story segment around ${wordCountTarget}.`;
 
     if (isFinal) {
-        // Prompt for conclusion - ask for JSON with ONLY a "story" key
-        finalPrompt = `[INST] You are a creative children's story writer concluding a short interactive story (currently at step ${currentStep} of ${targetSteps}). Write a short concluding paragraph (around 50-70 words) based on the user's final choice.
+        // Prompt for conclusion
+        finalPrompt = `[INST] ${baseInstruction} Conclude the interactive story (currently at step ${currentStep} of ${targetSteps}) based on the user's final choice.
 
 User input/previous context:
 ${prompt}
@@ -87,55 +91,55 @@ ${prompt}
 Your response MUST be a valid JSON object containing ONLY the key "story".
 "story": string (The concluding story paragraph).
 
-Example JSON output:
+Example JSON output (simple language):
 {
-  "story": "And so, Lily and the fairy became the best of friends, sharing many more adventures."
+  "story": "And the little fox found his way home, safe and sound. The end!"
 }
 
 Output ONLY the JSON object. [/INST]`;
-        maxTokens = 150; 
+        maxTokens = 120; 
     } else if (isPenultimate) {
-        // Penultimate step: prompt to lead towards conclusion
-        finalPrompt = `[INST] You are a creative children's story writer writing a short interactive story (currently at step ${currentStep} of ${targetSteps}). Write a short story continuation (around 50-70 words) based on the user's input that leads towards a natural conclusion in the *next* step.
+        // Penultimate step
+        finalPrompt = `[INST] ${baseInstruction} Continue the interactive story (currently at step ${currentStep} of ${targetSteps}) based on the user's input. Make sure this part leads towards a simple ending in the *next* step.
 
 User input/context:
 ${prompt}
 
 Your response MUST be a valid JSON object containing ONLY the following keys: "story", "question", and "choices".
 "story": string (The story continuation text).
-"question": string (A short question setting up the final choice?).
-"choices": array of 3 strings (Three short action choices that will lead to a conclusion).
+"question": string (A simple question setting up the final choice?).
+"choices": array of 3 strings (Three simple action choices leading to an end).
 
-Example JSON output:
+Example JSON output (simple language):
 {
-  "story": "Lily saw the path fork. One way led to the dark woods, the other towards a sunny meadow.",
-  "question": "Which path should Lily take to finish her journey?",
-  "choices": ["Dark woods", "Sunny meadow", "Rest here"]
+  "story": "Bunny saw two paths. One looked sunny, the other looked shady.",
+  "question": "Which path should Bunny take?",
+  "choices": ["Sunny path", "Shady path", "Go home"]
 }
 
 Output ONLY the JSON object. [/INST]`;
-        maxTokens = 250;
+        maxTokens = 200;
     } else {
         // Normal intermediate step
-        finalPrompt = `[INST] You are a creative children's story writer writing a short interactive story (currently at step ${currentStep} of ${targetSteps}). Write a short story continuation (around 50-70 words) based on the user's input.
+        finalPrompt = `[INST] ${baseInstruction} Continue the interactive story (currently at step ${currentStep} of ${targetSteps}) based on the user's input.
 
 User input/context:
 ${prompt}
 
 Your response MUST be a valid JSON object containing ONLY the following keys: "story", "question", and "choices".
 "story": string (The story continuation text).
-"question": string (A short question asking what the main character should do next?).
-"choices": array of 3 strings (Three short action choices).
+"question": string (A simple question asking what to do next?).
+"choices": array of 3 strings (Three simple action choices).
 
-Example JSON output:
+Example JSON output (simple language):
 {
-  "story": "Lily looked closer and saw tiny wings fluttering inside the jar!",
-  "question": "Should Lily open the jar?",
-  "choices": ["Open", "Wait", "Shake"]
+  "story": "Wow! A tiny fairy flew out of the flower!",
+  "question": "Should Leo say hello?",
+  "choices": ["Say hello", "Hide", "Wave"]
 }
 
 Output ONLY the JSON object. [/INST]`;
-         maxTokens = 250; 
+         maxTokens = 200; 
     }
 
     const completion = await together.chat.completions.create({
@@ -297,7 +301,7 @@ app.post('/start-story', async (req, res) => {
     console.log(`Session ${sessionId} created and stored in Redis.`);
 
     console.log('Generating first story segment (Step 1) using Together AI...');
-    const initialPrompt = `Start a short interactive children's story (around ${TARGET_STEPS} steps) with the following elements: Style: ${style}, Character: ${character}, Setting: ${setting}, Theme: ${effectiveTheme}. Begin the story and ask the first question with 3 choices.`;
+    const initialPrompt = `Start a short interactive children's story (around ${TARGET_STEPS} steps) for a 4-6 year old using simple words and short sentences. Use these ideas: Style: ${style}, Character: ${character}, Setting: ${setting}, Theme: ${effectiveTheme}. Begin the story and ask the first question with 3 simple choices.`;
 
     console.log('Using prompt for Together AI text generation:', initialPrompt);
 
@@ -387,10 +391,10 @@ app.post('/generate-next', async (req, res) => {
     // Combine initial prompts and history for context
     let contextPrompt = `Initial story setup: Style: ${sessionData.style}, Character: ${sessionData.character}, Setting: ${sessionData.setting}, Theme: ${sessionData.theme || ''}.\n`;
     // Add previous story parts (limit history length if needed)
-    sessionData.segments.forEach((segment, index) => {
-        contextPrompt += `Part ${index + 1}: ${segment.text}\n`;
+    sessionData.segments.slice(-3).forEach((segment, index) => { // Limit context to last 3 segments + choice
+        contextPrompt += `Part ${sessionData.segments.length - sessionData.segments.slice(-3).length + index + 1}: ${segment.text}\n`;
     });
-    contextPrompt += `User just chose: "${userChoice}"`;
+    contextPrompt += `The child just chose: "${userChoice}". Now continue the story for a 4-6 year old using simple words and short sentences.`;
 
     // Determine if this is the final step
     const isFinalStep = currentStepCount === TARGET_STEPS;

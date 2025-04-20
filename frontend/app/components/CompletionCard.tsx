@@ -15,9 +15,9 @@ const CompletionCard: React.FC<CompletionCardProps> = ({
 }) => {
   return (
     <View style={styles.cardContainer}>
-      <MaterialIcons name="celebration" size={50} color="#FFB74D" style={styles.icon} />
-      <Text style={styles.title}>Your Story is Ready!</Text>
-      <Text style={styles.subtitle}>Give your masterpiece a title:</Text>
+      <MaterialIcons name="auto-awesome" size={50} color="#FFB74D" style={styles.icon} />
+      <Text style={styles.title}>Story Time Over!</Text>
+      <Text style={styles.subtitle}>What should we call your story?</Text>
       
       <TextInput
         style={styles.titleInput}
@@ -29,7 +29,7 @@ const CompletionCard: React.FC<CompletionCardProps> = ({
       
       <TouchableOpacity style={styles.saveButton} onPress={onSave}>
         <MaterialIcons name="save" size={24} color="white" />
-        <Text style={styles.buttonText}>Finish & Save</Text>
+        <Text style={styles.buttonText}>Save My Story!</Text>
       </TouchableOpacity>
     </View>
   );

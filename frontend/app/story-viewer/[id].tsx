@@ -56,7 +56,7 @@ export default function StoryViewer() {
   if (!story) {
     return (
       <SafeAreaView style={styles.container}>
-        <Text>Loading...</Text>
+        <Text>Getting your story...</Text>
       </SafeAreaView>
     );
   }
@@ -69,9 +69,9 @@ export default function StoryViewer() {
         options={{
           title: story.title,
           headerStyle: {
-            backgroundColor: 'white',
+            backgroundColor: '#FFF0F5',
           },
-          headerTintColor: '#333',
+          headerTintColor: '#6A0DAD',
           headerTitleStyle: {
             fontWeight: 'bold',
           },
@@ -100,11 +100,11 @@ export default function StoryViewer() {
           disabled={!currentSegment}
         >
           <MaterialIcons name="arrow-back" size={24} color={currentSegment ? 'white' : '#999'} />
-          <Text style={[styles.navButtonText, !currentSegment && styles.disabledText]}>Previous</Text>
+          <Text style={[styles.navButtonText, !currentSegment && styles.disabledText]}>Back</Text>
         </TouchableOpacity>
 
         <Text style={styles.pageIndicator}>
-          {currentSegment + 1} of {story.segments.length}
+          Page {currentSegment + 1}
         </Text>
 
         <TouchableOpacity

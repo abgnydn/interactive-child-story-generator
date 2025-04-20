@@ -8,7 +8,7 @@ interface LoadingSpinnerProps {
 }
 
 export default function LoadingSpinner({ 
-  message = 'Loading...',
+  message = 'Making your story...',
   onIconClick 
 }: LoadingSpinnerProps): JSX.Element {
   const [bounceAnim] = useState(new Animated.Value(0));
@@ -20,11 +20,11 @@ export default function LoadingSpinner({
   const icons = ['auto-stories', 'book', 'star', 'favorite', 'emoji-events'] as const;
   const colors = ['#4CAF50', '#FF9800', '#2196F3', '#9C27B0', '#00BCD4'];
   const funMessages = [
-    "✨ Creating magic for you ✨",
-    "🎨 Painting your story...",
-    "🌟 Sprinkling some stardust...",
-    "📚 Writing the next bestseller...",
-    "🎭 Adding some drama..."
+    "✨ Making magic... ✨",
+    "🎨 Drawing pictures...",
+    "🌟 Adding sparkles...",
+    "📚 Thinking of ideas...",
+    "🎭 Getting exciting..."
   ];
   const [currentMessage, setCurrentMessage] = useState(funMessages[0]);
   
@@ -111,11 +111,14 @@ export default function LoadingSpinner({
       <Text style={styles.message}>{message}</Text>
       <Text style={styles.subMessage}>{currentMessage}</Text>
       
+      {/* Optional: Hide or keep the icon collection game? Hiding for simplicity for now */}
+      {/* 
       <View style={styles.statsContainer}>
         <Text style={styles.statsText}>
-          Icons collected: {clickedIcons.size}/{icons.length}
+          Fun things found: {clickedIcons.size}
         </Text>
       </View>
+      */}
     </View>
   );
 }

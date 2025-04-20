@@ -190,12 +190,12 @@ export default function StoryBuilder(): JSX.Element {
       if (response.status === 429) {
         const data = await response.json();
         handleRateLimitError(data.retryAfter || 30);
-        throw new Error('Rate limit exceeded. Please try again later.');
+        throw new Error('Rate limit exceeded');
       }
 
       // Handle other non-200 responses
       if (!response.ok) {
-        throw new Error('Failed to start story session');
+        throw new Error(`Server error: ${response.statusText}`);
       }
 
       const data = await response.json();
@@ -255,16 +255,7 @@ export default function StoryBuilder(): JSX.Element {
         }));
       }
     } catch (error) {
-      console.error('Error starting story:', error);
-      setError(error instanceof Error ? error.message : 'Failed to generate story');
-      // Only show alert if not rate limited
-      if (!isRateLimited) {
-        Alert.alert(
-          'Error',
-          'Failed to generate story. Please try again.',
-          [{ text: 'OK' }]
-        );
-      }
+      handleApiError('start the story', error);
     } finally {
       setIsLoading(false);
     }
@@ -294,6 +285,7 @@ export default function StoryBuilder(): JSX.Element {
 
     setIsLoading(true); 
     setIsRateLimited(false);
+    setError(null);
     
     try {
       // --- API Call --- 
@@ -332,19 +324,7 @@ export default function StoryBuilder(): JSX.Element {
       // ----------------------------
 
     } catch (error) {
-      console.error('Error generating next segment:', error);
-      setError(error instanceof Error ? error.message : 'Failed to generate story segment');
-      // Restore question/choices if API failed?
-      // Maybe set currentQuestion = "Error fetching next part... Try again?" and provide limited choices?
-      // Or revert the userChoiceText addition?
-      // For now, just show alert.
-      if (!isRateLimited) {
-        Alert.alert(
-          'Error',
-          'Failed to generate the next part of your story. Please try again.',
-          [{ text: 'OK' }]
-        );
-      }
+      handleApiError('get the next part', error);
     } finally {
       setIsLoading(false);
     }
@@ -419,17 +399,17 @@ export default function StoryBuilder(): JSX.Element {
     const stepNumber = choicesCount + 1;
     switch (step) {
       case 'style':
-        return `Step ${stepNumber} of ${TOTAL_CHOICE_STEPS}: Story Type`;
+        return `Step ${stepNumber}: Pick a Story Type!`;
       case 'character':
-        return `Step ${stepNumber} of ${TOTAL_CHOICE_STEPS}: Main Character`;
+        return `Step ${stepNumber}: Who's the Star?`;
       case 'setting':
-        return `Step ${stepNumber} of ${TOTAL_CHOICE_STEPS}: Setting`;
+        return `Step ${stepNumber}: Where Are We?`;
       case 'theme':
-        return `Step ${stepNumber} of ${TOTAL_CHOICE_STEPS}: Theme`;
+        return `Step ${stepNumber}: What's it About?`;
       case 'visualStyle':
-        return `Step ${stepNumber} of ${TOTAL_CHOICE_STEPS}: Visual Style`;
+        return `Step ${stepNumber}: How Should it Look?`;
       case 'story':
-        return story?.title || 'Your Story';
+        return story?.title || 'Your Story Adventure';
       case 'complete':
         return 'Story Complete!';
       default:
@@ -464,7 +444,7 @@ export default function StoryBuilder(): JSX.Element {
         imageUrl: story.segments[story.segments.length - 1]?.imageUrl || "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=800"
       };
       
-      const finalTitle = storyTitle.trim() || 'My Awesome Story';
+      const finalTitle = storyTitle.trim() || 'My Fun Story';
       const storyWithId = story.id ? story : { 
         ...story, 
         id: Date.now().toString(),
@@ -488,8 +468,20 @@ export default function StoryBuilder(): JSX.Element {
       router.replace('/'); 
     } catch (error) {
       console.error('Error saving final story:', error);
-      Alert.alert('Error', 'Failed to save story. Please try again.');
+      Alert.alert('Oh no!', 'Couldn\'t save the story. Try again?');
     }
+  };
+
+  // Error handling adjustments
+  const handleApiError = (context: string, error: any) => {
+    console.error(`Error ${context}:`, error);
+    const message = error instanceof Error ? error.message : 'Something went wrong';
+    // Simple, consistent error message
+    Alert.alert(
+      'Oops!',
+      `Couldn't ${context}. Please try again!\n(${message})`, // Keep technical error for debugging
+      [{ text: 'OK' }]
+    );
   };
 
   return (
@@ -498,12 +490,12 @@ export default function StoryBuilder(): JSX.Element {
         options={{
           title: renderStepTitle(currentStep, selectedChoices.length), // Pass selectedChoices.length
           headerStyle: {
-            backgroundColor: 'white',
+            backgroundColor: '#FFF0F5', // Updated background color
           },
-          headerTintColor: '#333',
+          headerTintColor: '#6A0DAD', // Updated tint color
           headerTitleStyle: {
             fontWeight: 'bold',
-            fontSize: 16, // Adjust font size if needed
+            fontSize: 16, // Keeping font size
           },
           headerBackVisible: false, // Explicitly hide default back button
           headerLeft: () => {
@@ -511,7 +503,7 @@ export default function StoryBuilder(): JSX.Element {
               // When in story mode, back button prompts to finish (which now saves and goes home)
               return (
                 <TouchableOpacity onPress={promptFinishStory} style={{ marginLeft: 10 }}>
-                  <MaterialIcons name="arrow-back" size={24} color="#333" />
+                  <MaterialIcons name="arrow-back" size={24} color="#6A0DAD" />
                 </TouchableOpacity>
               );
             } else if (['character', 'setting', 'theme', 'visualStyle'].includes(currentStep)) {
@@ -531,7 +523,7 @@ export default function StoryBuilder(): JSX.Element {
                    setSelectedChoices(prev => prev.slice(0, -1));
                    setCurrentStep(previousStepMap[currentStep]);
                  }} style={{ marginLeft: 10 }}>
-                  <MaterialIcons name="arrow-back" size={24} color="#333" />
+                  <MaterialIcons name="arrow-back" size={24} color="#6A0DAD" />
                 </TouchableOpacity>
                );
             } else {
@@ -566,7 +558,7 @@ export default function StoryBuilder(): JSX.Element {
                       onPress={() => handleStyleChoice(choice)}
                     >
                       <MaterialIcons name="check-circle-outline" size={20} color="white" />
-                      <Text style={styles.buttonText}>Select</Text>
+                      <Text style={styles.buttonText}>Choose This!</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -621,26 +613,18 @@ export default function StoryBuilder(): JSX.Element {
       {isRateLimited && (
         <View style={styles.rateLimitContainer}>
           <Text style={styles.rateLimitText}>
-            Rate limit reached. Please wait {retryCountdown} seconds before trying again.
+            Whoa, too fast! Let's wait {retryCountdown} seconds.
           </Text>
           <TouchableOpacity
             style={styles.retryButton}
             onPress={() => {
               setIsRateLimited(false);
-              if (!story) {
-                startStory();
-                return;
-              }
-              if (story.segments.length === 0) {
-                startStory();
-              } else {
-                // Need the last choice to retry handleChoice correctly.
-                // For now, just prompt to finish again if they retry during story
-                promptFinishStory();
-              }
+              if (!story || story.segments.length === 0) {
+                 startStory();
+              } 
             }}
           >
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <Text style={styles.retryButtonText}>Try Again</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -685,12 +669,12 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
   },
-  stepQuestionTitle: { // Renamed from stepTitle
-    fontSize: 22,
+  stepQuestionTitle: {
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
     textAlign: 'center',
-    marginVertical: 20, 
+    marginVertical: 15,
   },
   choicesGrid: {
     flexDirection: 'row',

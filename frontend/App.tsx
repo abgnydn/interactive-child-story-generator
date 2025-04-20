@@ -8,11 +8,12 @@ export default function App(): JSX.Element {
     <Stack
       screenOptions={{
         headerStyle: {
-          backgroundColor: colorScheme === 'dark' ? '#000' : '#fff',
+          backgroundColor: colorScheme === 'dark' ? '#4A4E69' : '#FFF0F5',
         },
-        headerTintColor: colorScheme === 'dark' ? '#fff' : '#000',
+        headerTintColor: colorScheme === 'dark' ? '#FFFACD' : '#6A0DAD',
         headerTitleStyle: {
           fontWeight: 'bold',
+          fontSize: 18,
         },
       }}
     />
