@@ -494,8 +494,8 @@ export default function StoryBuilder(): JSX.Element {
           },
           headerTintColor: '#6A0DAD', // Updated tint color
           headerTitleStyle: {
-            fontFamily: 'Quicksand_700Bold', // Apply font to header
-            fontSize: 18, // Adjust if needed
+            fontFamily: 'Quicksand_700Bold', // KEEP font
+            fontSize: 18, 
           },
           headerBackVisible: false, // Explicitly hide default back button
           headerLeft: () => {
@@ -547,21 +547,11 @@ export default function StoryBuilder(): JSX.Element {
             <ScrollView contentContainerStyle={styles.choicesGrid}>
               {getCurrentChoices().map((choice) => (
                 <View key={choice.id} style={styles.card}>
-                  <View style={styles.cardImageContainer}>
-                     {choice.imageUrl ? (
-                       <Image 
-                         source={{ uri: choice.imageUrl }}
-                         style={styles.cardImage}
-                         resizeMode="cover" 
-                       />
-                     ) : (
-                       <View style={[styles.cardImage, { backgroundColor: choice.color + '20', justifyContent: 'center', alignItems: 'center' }]}>
-                         <MaterialIcons name="image-not-supported" size={40} color={choice.color || '#ccc'} /> 
-                       </View>
-                     )}
+                  <View style={[styles.cardIconBackground, { backgroundColor: choice.color + '20' }]}> 
+                    <MaterialIcons name={choice.icon || 'help-outline'} size={64} color={choice.color} /> 
                   </View>
                   <View style={styles.cardContent}>
-                    <Text style={[styles.imageTitle, { color: choice.color }]}>{choice.name}</Text>
+                    <Text style={[styles.cardName, { color: choice.color }]}>{choice.name}</Text>
                     <Text style={styles.cardDescription}>{choice.description}</Text>
                     <TouchableOpacity
                       style={[styles.button, { backgroundColor: choice.color }]}
@@ -680,80 +670,74 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   stepQuestionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 20, 
     color: '#333',
     textAlign: 'center',
     marginVertical: 15,
-    fontFamily: 'Quicksand_700Bold', // Apply new font
+    fontFamily: 'Quicksand_700Bold', // KEEP font
   },
   choicesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-around',
-    paddingHorizontal: 5,
+    paddingHorizontal: 10, // Restore padding
     paddingBottom: 20,
   },
   card: {
-    width: '47%',
+    width: '46%', // Restore width
     backgroundColor: 'white',
-    borderRadius: 18,
-    marginBottom: 18,
+    borderRadius: 15, // Restore radius
+    marginBottom: 15, // Restore spacing
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowOpacity: 0.08, // Restore shadow
+    shadowRadius: 5,
+    elevation: 3,
   },
-  cardImageContainer: {
-    width: '100%',
-    height: 120,
-    backgroundColor: '#f0f0f0',
+  cardIconBackground: { // Style for icon background
+    paddingVertical: 25, 
+    alignItems: 'center',
+    borderTopLeftRadius: 15, 
+    borderTopRightRadius: 15,
   },
-  cardImage: {
-    width: '100%',
-    height: '100%',
-  },
-  imageTitle: {
-    fontSize: 17,
-    fontWeight: 'bold',
-    marginTop: 8,
-    marginBottom: 4,
+  cardName: { // Style for name below icon
+    fontSize: 17, 
+    marginTop: 10, // Adjusted margin
+    marginBottom: 5,
     textAlign: 'center',
-    fontFamily: 'Quicksand_700Bold',
-    color: '#444',
+    fontFamily: 'Quicksand_700Bold', // KEEP font
   },
   cardContent: {
-    padding: 12,
-    paddingTop: 0,
-    alignItems: 'center',
+    padding: 15, // Restore padding
+    paddingTop: 5, // Adjust top padding
+    alignItems: 'center', 
   },
   cardDescription: {
-    fontSize: 14,
+    fontSize: 14, 
     color: '#666',
-    lineHeight: 20,
-    marginBottom: 15,
-    minHeight: 40,
-    textAlign: 'center',
-    fontFamily: 'Quicksand_500Medium',
+    lineHeight: 20, 
+    marginBottom: 15, 
+    minHeight: 50, // Restore min height
+    textAlign: 'center', 
+    fontFamily: 'Quicksand_500Medium', // KEEP font
   },
   button: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    borderRadius: 15,
-    width: '90%',
-    alignSelf: 'center',
+    paddingVertical: 12, // Restore padding
+    paddingHorizontal: 16,
+    borderRadius: 12, // Restore radius
+    width: 'auto', // Restore width
+    minWidth: '85%', // Ensure button takes good width
+    alignSelf: 'center', // Restore alignSelf
   },
   buttonText: {
     color: 'white',
-    fontSize: 17,
-    fontWeight: 'bold',
+    fontSize: 16, // Restore font size
     marginLeft: 8,
-    fontFamily: 'Quicksand_700Bold',
+    fontFamily: 'Quicksand_700Bold', // KEEP font
   },
   titleContainer: { // This style seems unused, maybe remove later?
     padding: 16,

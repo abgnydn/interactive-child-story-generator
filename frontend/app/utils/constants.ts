@@ -34,7 +34,7 @@ export const STORY_STYLES: StyleChoice[] = [
     imageUrl: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=800',
     prompt: 'nature exploration adventure',
     color: '#4CAF50',
-    icon: 'park'
+    icon: 'forest'
   },
   {
     id: 'ocean',
@@ -122,7 +122,7 @@ export const SETTINGS: StyleChoice[] = [
     imageUrl: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800',
     prompt: 'space station setting',
     color: '#3F51B5',
-    icon: 'apartment'
+    icon: 'public'
   },
   {
     id: 'ocean',
@@ -146,7 +146,7 @@ export const THEMES: StyleChoice[] = [
     imageUrl: 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=800',
     prompt: 'friendship theme',
     color: '#FF69B4',
-    icon: 'favorite'
+    icon: 'people'
   },
   {
     id: 'courage',
